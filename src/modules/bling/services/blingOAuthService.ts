@@ -115,6 +115,8 @@ export class BlingOAuthService {
         code
       });
 
+      console.log('PASSOU POR AQUI - ANTES DO POST PARA BLING')
+      
       const response = await axios.post(
         this.BLING_TOKEN_URL,
         body.toString(),
@@ -127,7 +129,7 @@ export class BlingOAuthService {
           timeout: 15000
         }
       );
-
+      
       const {
         access_token,
         refresh_token,
@@ -135,9 +137,11 @@ export class BlingOAuthService {
         scope,
         token_type
       } = response.data;
-
+      
       const expiresAt = new Date(Date.now() + (expires_in || 3600) * 1000);
-
+      
+      console.log('PASSOU POR AQUI - DEPOIS DO POST PARA BLING - ANTES DO SAVE')
+      
       await this.blingRepository.save({
         access_token,
         refresh_token,

@@ -5,7 +5,7 @@ import { logger } from './shared/utils/logger';
 
 dotenv.config();
 
-const PORT = Number(process.env.PORT) || 3333;
+const PORT = Number(process.env.PORT) || 3000;
 const NODE_ENV = process.env.NODE_ENV
 
 app.listen(PORT, () => {

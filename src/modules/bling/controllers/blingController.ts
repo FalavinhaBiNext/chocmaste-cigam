@@ -17,8 +17,9 @@ export class BlingController {
   };
 
   callback = async (req: Request, res: Response) => {
-    const { code } = validateCallbackQuery(req.query);
-    await this.blingService.handleCallback(code);
+    const { code } = req.query;
+    console.log('CODE CONTROLLER', code)
+    await this.blingService.handleCallback(String(code));
     return res.json({
       success: true,
       message: 'Autenticação Bling realizada com sucesso.'
