@@ -19,6 +19,8 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm install --save-prod sequelize-cli && npm cache clean --force
 
 COPY --from=builder /app/dist/ dist/
+COPY .sequelizerc ./
+COPY src/database/ src/database/
 COPY docker-entrypoint.sh /usr/local/bin/
 
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh && chown -R node:node /app
