@@ -1,0 +1,146 @@
+import { inject, injectable } from 'tsyringe';
+import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
+import { BlingRepository } from "../repositories/blingRepository";
+import { BlingOAuthService } from "./blingOAuthService";
+import { logger } from '@/shared/utils/logger';
+import {
+  IntegrationError,
+  UnauthorizedIntegrationError,
+  RateLimitIntegrationError,
+  BadGatewayError,
+  NotFoundError,
+  ConflictError,
+  ValidationError
+} from '@/shared/errors/AppError';
+
+@injectable()
+export class BlingHttpClient {
+  private readonly client: AxiosInstance;
+  private readonly BASE_URL = 'https://www.bling.com.br/Api/v3';
+
+  constructor(
+    @inject(BlingRepository) private readonly blingRepository: BlingRepository,
+    @inject(BlingOAuthService) private readonly blingOAuthService: BlingOAuthService
+  ) {
+    this.client = axios.create({
+      baseURL: this.BASE_URL,
+      timeout: 30000,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
+  private async ensureValidToken(): Promise<string> {
+    const token = await this.blingRepository.findActive();
+    if (!token) {
+      throw new UnauthorizedIntegrationError(
+        'Nenhum token Bling ativo encontrado. Faça a autenticação primeiro.'
+      );
+    }
+
+    const now = new Date();
+    const expiresAt = token.expires_at ? new Date(token.expires_at) : null;
+
+    if (expiresAt && expiresAt.getTime() - now.getTime() < 5 * 60 * 1000) {
+      logger.auth('Token Bling expirado ou prestes a expirar. Renovando...');
+      await this.blingOAuthService.refreshAccessToken(token.id);
+      const refreshedToken = await this.blingRepository.findActive();
+      return refreshedToken!.access_token;
+    }
+
+    return token.access_token;
+  }
+
+  async get<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
+    return this.request<T>('GET', url, config);
+  }
+
+  async post<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
+    return this.request<T>('POST', url, config, data);
+  }
+
+  async put<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
+    return this.request<T>('PUT', url, config, data);
+  }
+
+  async patch<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
+    return this.request<T>('PATCH', url, config, data);
+  }
+
+  async delete<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
+    return this.request<T>('DELETE', url, config);
+  }
+
+  private async request<T>(
+    method: string,
+    url: string,
+    config?: AxiosRequestConfig,
+    data?: any
+  ): Promise<T> {
+    const accessToken = await this.ensureValidToken();
+
+    try {
+      const response = await this.client.request<T>({
+        method,
+        url,
+        data,
+        ...config,
+        headers: {
+          ...config?.headers,
+          Authorization: `Bearer ${accessToken}`
+        }
+      });
+
+      return response.data;
+    } catch (error: any) {
+      if (error.response?.status === 401) {
+        logger.auth('Token Bling rejeitado (401). Tentando renovar...');
+        const token = await this.blingRepository.findActive();
+        if (token) {
+          await this.blingOAuthService.refreshAccessToken(token.id);
+          const refreshedToken = await this.blingRepository.findActive();
+          if (refreshedToken) {
+            const retryResponse = await this.client.request<T>({
+              method,
+              url,
+              data,
+              ...config,
+              headers: {
+                ...config?.headers,
+                Authorization: `Bearer ${refreshedToken.access_token}`
+              }
+            });
+            return retryResponse.data;
+          }
+        }
+        throw new UnauthorizedIntegrationError(
+          'Token Bling inválido e renovação automática falhou.'
+        );
+      }
+
+      throw this.mapError(error);
+    }
+  }
+
+  private mapError(error: any): Error {
+    const status = error.response?.status;
+    const data = error.response?.data;
+    const message = data?.error?.description || data?.error?.message || data?.error || error.message;
+
+    logger.error(`Erro na API Bling [${status}]`, { message });
+
+    switch (status) {
+      case 400: return new ValidationError(message, data);
+      case 403: return new UnauthorizedIntegrationError('Acesso negado pela API Bling.');
+      case 404: return new NotFoundError(`Recurso Bling não encontrado: ${message}`);
+      case 409: return new ConflictError(`Conflito na API Bling: ${message}`);
+      case 422: return new ValidationError(`Dados inválidos para API Bling: ${message}`, data);
+      case 429: return new RateLimitIntegrationError();
+      case 502:
+      case 503:
+      case 504:
+        return new BadGatewayError(`Serviço Bling indisponível [${status}]: ${message}`);
+      default:
+        return new IntegrationError(`Erro na integração Bling: ${message}`, { status, data });
+    }
+  }
+}

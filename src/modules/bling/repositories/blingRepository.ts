@@ -1,0 +1,45 @@
+import { injectable } from 'tsyringe';
+import { BlingModel } from "../models/blingModel";
+import { IBlingTokenRepository } from "../interfaces/IBlingTokenRepository";
+import { CreateBlingTokenDTO, ResponseBlingTokenDTO, UpdateBlingTokenDTO } from "../dto";
+import { BlingMapper } from "../mappers/BlingMapper";
+import { NotFoundError } from "@/shared/errors/AppError";
+
+@injectable()
+export class BlingRepository implements IBlingTokenRepository {
+  async findActive(): Promise<ResponseBlingTokenDTO | null> {
+    const token = await BlingModel.findOne({ where: { active: true } });
+    if (!token) return null;
+    return BlingMapper.tokenToDTO(token);
+  }
+
+  async findById(id: string): Promise<ResponseBlingTokenDTO | null> {
+    const token = await BlingModel.findByPk(id);
+    if (!token) return null;
+    return BlingMapper.tokenToDTO(token);
+  }
+
+  async save(data: CreateBlingTokenDTO): Promise<ResponseBlingTokenDTO> {
+    const token = await BlingModel.create({
+      access_token: data.access_token,
+      refresh_token: data.refresh_token,
+      expires_at: data.expires_at,
+      scope: data.scope,
+      token_type: data.token_type,
+      access_token_url: data.access_token_url || process.env.BLING_ACCESS_TOKEN_URL || 'https://www.bling.com.br/Api/v3/oauth/token',
+      client_id: data.client_id || process.env.BLING_CLIENT_ID!,
+      client_secret: data.client_secret || process.env.BLING_CLIENT_SECRET!,
+      active: data.active !== undefined ? data.active : true
+    });
+    return BlingMapper.tokenToDTO(token);
+  }
+
+  async update(id: string, data: UpdateBlingTokenDTO): Promise<ResponseBlingTokenDTO> {
+    const token = await BlingModel.findByPk(id);
+    if (!token) {
+      throw new NotFoundError(`Token Bling ${id} não encontrado`);
+    }
+    await token.update(data);
+    return BlingMapper.tokenToDTO(token);
+  }
+}

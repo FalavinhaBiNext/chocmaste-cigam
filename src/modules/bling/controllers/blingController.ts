@@ -1,0 +1,43 @@
+import { inject, injectable } from 'tsyringe';
+import { Request, Response } from "express";
+import { BlingService } from '../services/blingService';
+import { validateCallbackQuery } from '../bling.validator';
+import { logger } from '@/shared/utils/logger';
+
+@injectable()
+export class BlingController {
+  constructor(
+    private readonly blingService: BlingService
+  ) {}
+
+  auth = (_req: Request, res: Response) => {
+    const { url } = this.blingService.generateAuthURL();
+    logger.auth('Redirecionando para autorização Bling');
+    return res.redirect(url);
+  };
+
+  callback = async (req: Request, res: Response) => {
+    const { code } = validateCallbackQuery(req.query);
+    await this.blingService.handleCallback(code);
+    return res.json({
+      success: true,
+      message: 'Autenticação Bling realizada com sucesso.'
+    });
+  };
+
+  refresh = async (_req: Request, res: Response) => {
+    await this.blingService.refreshToken();
+    return res.json({
+      success: true,
+      message: 'Token Bling renovado com sucesso.'
+    });
+  };
+
+  status = async (_req: Request, res: Response) => {
+    const result = await this.blingService.getTokenStatus();
+    return res.json({
+      success: true,
+      data: result
+    });
+  };
+}
