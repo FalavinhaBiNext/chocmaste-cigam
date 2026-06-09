@@ -3,11 +3,11 @@ FROM node:22-slim AS builder
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm ci --include=dev
+RUN npm ci --include=dev && npm install --no-save tsc-alias
 
 COPY tsconfig.json ./
 COPY src/ src/
-RUN npm run build
+RUN npm run build && npx tsc-alias
 
 FROM node:22-slim AS production
 
@@ -16,10 +16,9 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
 
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev && npm install --save-prod sequelize-cli tsconfig-paths && npm cache clean --force
+RUN npm ci --omit=dev && npm install --save-prod sequelize-cli && npm cache clean --force
 
 COPY --from=builder /app/dist/ dist/
-COPY tsconfig.json ./
 COPY .sequelizerc ./
 COPY src/database/ src/database/
 COPY docker-entrypoint.sh /usr/local/bin/
@@ -34,4 +33,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
 EXPOSE 3333
 
 ENTRYPOINT ["docker-entrypoint.sh"]
-CMD ["node", "-r", "tsconfig-paths/register", "dist/server.js"]
+CMD ["node", "dist/server.js"]
