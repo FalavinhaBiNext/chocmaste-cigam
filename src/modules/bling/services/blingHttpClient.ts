@@ -16,7 +16,7 @@ import {
 @injectable()
 export class BlingHttpClient {
   private readonly client: AxiosInstance;
-  private readonly BASE_URL = 'https://www.bling.com.br/Api/v3';
+  private readonly BASE_URL = 'https://api.bling.com.br/Api/v3';
 
   constructor(
     @inject(BlingRepository) private readonly blingRepository: BlingRepository,
