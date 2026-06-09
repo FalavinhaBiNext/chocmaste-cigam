@@ -18,7 +18,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
 
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev && npm install --save-prod sequelize-cli tsconfig-paths && npm cache clean --force
+RUN npm ci --omit=dev && npm install --save-prod sequelize-cli tsconfig-paths && npm install chalk@4 && npm cache clean --force
 
 COPY --from=builder /app/dist/ dist/
 COPY .sequelizerc ./
