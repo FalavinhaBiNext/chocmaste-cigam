@@ -1,4 +1,4 @@
-FROM node:22-alpine AS builder
+FROM node:22-slim AS builder
 
 WORKDIR /app
 
@@ -7,13 +7,13 @@ RUN npm ci
 
 COPY tsconfig.json ./
 COPY src/ src/
-RUN npm run build
+RUN npx tsc
 
-FROM node:22-alpine AS production
+FROM node:22-slim AS production
 
 WORKDIR /app
 
-RUN apk add --no-cache curl
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
 
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm install --save-prod sequelize-cli && npm cache clean --force
