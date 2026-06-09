@@ -24,7 +24,7 @@ BlingModel.init({
     primaryKey: true
   },
   access_token: {
-    type: Sequelize.STRING,
+    type: Sequelize.TEXT,
     allowNull: false
   },
   refresh_token: {
