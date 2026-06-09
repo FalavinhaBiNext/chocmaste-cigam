@@ -38,3 +38,21 @@ export interface BlingAuthUrlDTO {
   url: string;
   state: string;
 }
+
+export interface ProdutoBlingDTO {
+  id: number;
+  nome: string;
+  codigo: string;
+  preco: number;
+  tipo: string;
+  situacao: string;
+  descricao: string;
+  unidade: string;
+  categoria?: { id: number; descricao: string };
+  marca?: { id: number; nome: string };
+  estoque?: { saldoFisico: number };
+}
+
+export interface ProdutoBlingResponse {
+  data: ProdutoBlingDTO;
+}
