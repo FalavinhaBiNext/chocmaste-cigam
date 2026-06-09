@@ -3,11 +3,11 @@ FROM node:22-slim AS builder
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm ci --include=dev
 
 COPY tsconfig.json ./
 COPY src/ src/
-RUN npx tsc
+RUN npm run build
 
 FROM node:22-slim AS production
 
