@@ -16,11 +16,12 @@ WORKDIR /app
 RUN apk add --no-cache curl
 
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev && npm cache clean --force
+RUN npm ci --omit=dev && npm install --save-prod sequelize-cli && npm cache clean --force
 
 COPY --from=builder /app/dist/ dist/
+COPY docker-entrypoint.sh /usr/local/bin/
 
-RUN chown -R node:node /app
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh && chown -R node:node /app
 
 USER node
 
@@ -29,4 +30,5 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
 
 EXPOSE 3333
 
+ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["node", "dist/server.js"]
