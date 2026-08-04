@@ -8,7 +8,8 @@ describe('TransportadoraService', () => {
 
   beforeEach(() => {
     repo = { create: vi.fn(), findAll: vi.fn(), findById: vi.fn(), findByIdBling: vi.fn(), update: vi.fn(), delete: vi.fn() };
-    svc = new TransportadoraService(repo);
+    const deParaRepo = { findAll: vi.fn() } as any;
+    svc = new TransportadoraService(repo, deParaRepo);
   });
 
   it('create', async () => {

@@ -26,7 +26,7 @@ describe('EventService', () => {
 
   it('findById', async () => {
     repo.findById.mockResolvedValue({ id: '1' });
-    expect((await svc.findById('1')).id).toBe('1');
+    expect((await svc.findById('1'))!.id).toBe('1');
   });
 
   it('findById throws', async () => {
@@ -36,7 +36,7 @@ describe('EventService', () => {
 
   it('findByPedido', async () => {
     repo.findByPedido.mockResolvedValue({ id: '1', pedido_id: 123 });
-    expect((await svc.findByPedido(123)).pedido_id).toBe(123);
+    expect((await svc.findByPedido(123))!.pedido_id).toBe(123);
   });
 
   it('findByPedido throws', async () => {
@@ -46,7 +46,7 @@ describe('EventService', () => {
 
   it('findByNumeroPedido', async () => {
     repo.findByNumeroPedido.mockResolvedValue({ id: '1', numero_pedido: 1001 });
-    expect((await svc.findByNumeroPedido(1001)).numero_pedido).toBe(1001);
+    expect((await svc.findByNumeroPedido(1001))!.numero_pedido).toBe(1001);
   });
 
   it('findByNumeroPedido throws', async () => {

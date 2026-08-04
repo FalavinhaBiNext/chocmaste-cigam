@@ -17,7 +17,7 @@ describe('EventRepository', () => {
   });
 
   it('create', async () => {
-    created = await repo.create(createEventInput({ id: '550e8400-e29b-41d4-a716-446655440000' }));
+    created = await repo.create(createEventInput({ id: '550e8400-e29b-41d4-a716-446655440000' }) as any);
     expect(created.id).toBeDefined();
     expect(created.event).toBe('order.created');
   });

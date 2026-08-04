@@ -8,7 +8,8 @@ describe('ClientesService', () => {
 
   beforeEach(() => {
     mockRepo = { create: vi.fn(), findAll: vi.fn(), findById: vi.fn(), findByIdBling: vi.fn(), update: vi.fn(), delete: vi.fn() };
-    service = new ClientesService(mockRepo);
+    const deParaRepo = { findAll: vi.fn() } as any;
+    service = new ClientesService(mockRepo, deParaRepo);
   });
 
   it('create', async () => {

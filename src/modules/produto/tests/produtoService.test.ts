@@ -16,7 +16,8 @@ describe('ProdutoService', () => {
       update: vi.fn(),
       delete: vi.fn(),
     };
-    service = new ProdutoService(mockRepository);
+    const deParaRepo = { findAll: vi.fn() } as any;
+    service = new ProdutoService(mockRepository, deParaRepo);
   });
 
   it('should create a produto', async () => {

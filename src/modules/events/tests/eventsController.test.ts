@@ -18,7 +18,8 @@ describe('EventController', () => {
 
   beforeEach(() => {
     svc = { create: vi.fn(), findAll: vi.fn(), findById: vi.fn(), findByPedido: vi.fn(), findByNumeroPedido: vi.fn() };
-    ctrl = new EventController(svc as any);
+    const webhookSvc = {} as any;
+    ctrl = new EventController(svc as any, webhookSvc);
   });
 
   it('health', () => {
