@@ -1,0 +1,222 @@
+{
+    "Configurador": {
+        "Codigo": "3343  ",
+        "Descricao": "Aquecedor de Papinha com Controle Digita",
+        "Ativo": true,
+        "UsuarioCriacao": "A11",
+        "DataCriacao": "2026-03-05",
+        "UsuarioModificacao": "A05",
+        "DataModificacao": "2026-03-05",
+        "Sessao": 0,
+        "TipoRegra": "D"
+    },
+    "Caracteristicas": [
+        {
+            "CaracteristicaConfigurador": {
+                "Caracteristica": {
+                    "Codigo": "016",
+                    "Descricao": "3343                ",
+                    "TipoConteudo": "P",
+                    "TipoConteudoDescricao": "Pré-Definido",
+                    "TipoDado": "A",
+                    "TipoDadoDescricao": "Alfanumérico",
+                    "ValorMascara": "20A                 ",
+                    "UsuarioCriacao": "A05",
+                    "DataCriacao": "2026-03-05",
+                    "UsuarioModificacao": "   ",
+                    "DataModificacao": null,
+                    "Sessao": 0,
+                    "ExibirDescricao": " ",
+                    "ExibirConteudo": " ",
+                    "ConteudoPorExpressao": false,
+                    "SolicitaVincImagem": false,
+                    "DescricaoReduzida": "                    "
+                },
+                "CodigoConfigurador": "3343  ",
+                "CodigoCaracteristica": "016",
+                "Ordem": 1,
+                "FaixaInicial": 0.0,
+                "FaixaFinal": 0.0,
+                "UsuarioCriacao": "A05",
+                "DataCriacao": "2026-03-05",
+                "UsuarioModificacao": "   ",
+                "DataModificacao": null,
+                "Sessao": 0,
+                "ConteudoPadrao": "                    "
+            },
+            "Caracteristica": {
+                "Caracteristica": {
+                    "Codigo": "016",
+                    "Descricao": "3343                ",
+                    "TipoConteudo": "P",
+                    "TipoConteudoDescricao": "Pré-Definido",
+                    "TipoDado": "A",
+                    "TipoDadoDescricao": "Alfanumérico",
+                    "ValorMascara": "20A                 ",
+                    "UsuarioCriacao": "A05",
+                    "DataCriacao": "2026-03-05",
+                    "UsuarioModificacao": "   ",
+                    "DataModificacao": null,
+                    "Sessao": 0,
+                    "ExibirDescricao": " ",
+                    "ExibirConteudo": " ",
+                    "ConteudoPorExpressao": false,
+                    "SolicitaVincImagem": false,
+                    "DescricaoReduzida": "                    "
+                },
+                "Mascara": {
+                    "ValorMascara": "20A                 ",
+                    "RespostaTipo": "A",
+                    "Inteiro": 0,
+                    "NumeroDecimal": 0,
+                    "Alfanumerico": 20
+                }
+            },
+            "ConteudosPreDefinidos": [
+                {
+                    "ConteudoCaracteristica": {
+                        "Caracteristica": null,
+                        "CodigoCaracteristica": "016",
+                        "Ordem": 0,
+                        "CodigoConteudo": "110 V               ",
+                        "ConteudoDescricao": "110 V                                                       ",
+                        "Ativo": true,
+                        "UsuarioCriacao": "A11",
+                        "DataCriacao": "2026-03-05",
+                        "UsuarioModificacao": "   ",
+                        "DataModificacao": null,
+                        "Sessao": 0,
+                        "DadoMinCorresp": 0.0,
+                        "DadoMaxCorrese": 0.0
+                    },
+                    "Caracteristica": {
+                        "Caracteristica": {
+                            "Codigo": "016",
+                            "Descricao": "3343                ",
+                            "TipoConteudo": "P",
+                            "TipoConteudoDescricao": "Pré-Definido",
+                            "TipoDado": "A",
+                            "TipoDadoDescricao": "Alfanumérico",
+                            "ValorMascara": "20A                 ",
+                            "UsuarioCriacao": "A05",
+                            "DataCriacao": "2026-03-05",
+                            "UsuarioModificacao": "   ",
+                            "DataModificacao": null,
+                            "Sessao": 0,
+                            "ExibirDescricao": " ",
+                            "ExibirConteudo": " ",
+                            "ConteudoPorExpressao": false,
+                            "SolicitaVincImagem": false,
+                            "DescricaoReduzida": "                    "
+                        },
+                        "Mascara": {
+                            "ValorMascara": "20A                 ",
+                            "RespostaTipo": "A",
+                            "Inteiro": 0,
+                            "NumeroDecimal": 0,
+                            "Alfanumerico": 20
+                        }
+                    },
+                    "Conteudo": "110 V               ",
+                    "ConteudoNumerico": 0.0
+                },
+                {
+                    "ConteudoCaracteristica": {
+                        "Caracteristica": null,
+                        "CodigoCaracteristica": "016",
+                        "Ordem": 0,
+                        "CodigoConteudo": "220 V               ",
+                        "ConteudoDescricao": "220 V                                                       ",
+                        "Ativo": true,
+                        "UsuarioCriacao": "A11",
+                        "DataCriacao": "2026-03-05",
+                        "UsuarioModificacao": "   ",
+                        "DataModificacao": null,
+                        "Sessao": 0,
+                        "DadoMinCorresp": 0.0,
+                        "DadoMaxCorrese": 0.0
+                    },
+                    "Caracteristica": {
+                        "Caracteristica": {
+                            "Codigo": "016",
+                            "Descricao": "3343                ",
+                            "TipoConteudo": "P",
+                            "TipoConteudoDescricao": "Pré-Definido",
+                            "TipoDado": "A",
+                            "TipoDadoDescricao": "Alfanumérico",
+                            "ValorMascara": "20A                 ",
+                            "UsuarioCriacao": "A05",
+                            "DataCriacao": "2026-03-05",
+                            "UsuarioModificacao": "   ",
+                            "DataModificacao": null,
+                            "Sessao": 0,
+                            "ExibirDescricao": " ",
+                            "ExibirConteudo": " ",
+                            "ConteudoPorExpressao": false,
+                            "SolicitaVincImagem": false,
+                            "DescricaoReduzida": "                    "
+                        },
+                        "Mascara": {
+                            "ValorMascara": "20A                 ",
+                            "RespostaTipo": "A",
+                            "Inteiro": 0,
+                            "NumeroDecimal": 0,
+                            "Alfanumerico": 20
+                        }
+                    },
+                    "Conteudo": "220 V               ",
+                    "ConteudoNumerico": 0.0
+                },
+                {
+                    "ConteudoCaracteristica": {
+                        "Caracteristica": null,
+                        "CodigoCaracteristica": "016",
+                        "Ordem": 0,
+                        "CodigoConteudo": "440 V               ",
+                        "ConteudoDescricao": "440 V                                                       ",
+                        "Ativo": true,
+                        "UsuarioCriacao": "A00",
+                        "DataCriacao": "2026-07-17",
+                        "UsuarioModificacao": "A00",
+                        "DataModificacao": "2026-07-17",
+                        "Sessao": 0,
+                        "DadoMinCorresp": 0.0,
+                        "DadoMaxCorrese": 0.0
+                    },
+                    "Caracteristica": {
+                        "Caracteristica": {
+                            "Codigo": "016",
+                            "Descricao": "3343                ",
+                            "TipoConteudo": "P",
+                            "TipoConteudoDescricao": "Pré-Definido",
+                            "TipoDado": "A",
+                            "TipoDadoDescricao": "Alfanumérico",
+                            "ValorMascara": "20A                 ",
+                            "UsuarioCriacao": "A05",
+                            "DataCriacao": "2026-03-05",
+                            "UsuarioModificacao": "   ",
+                            "DataModificacao": null,
+                            "Sessao": 0,
+                            "ExibirDescricao": " ",
+                            "ExibirConteudo": " ",
+                            "ConteudoPorExpressao": false,
+                            "SolicitaVincImagem": false,
+                            "DescricaoReduzida": "                    "
+                        },
+                        "Mascara": {
+                            "ValorMascara": "20A                 ",
+                            "RespostaTipo": "A",
+                            "Inteiro": 0,
+                            "NumeroDecimal": 0,
+                            "Alfanumerico": 20
+                        }
+                    },
+                    "Conteudo": "440 V               ",
+                    "ConteudoNumerico": 0.0
+                }
+            ],
+            "ConteudoPadrao": "                    ",
+            "ConteudoPadraoNumerico": 0.0
+        }
+    ]
+}

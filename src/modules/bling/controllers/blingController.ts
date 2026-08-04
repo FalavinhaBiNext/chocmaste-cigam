@@ -1,7 +1,7 @@
 import { inject, injectable } from 'tsyringe';
 import { Request, Response } from "express";
 import { BlingService } from '../services/blingService';
-import { validateCallbackQuery } from '../bling.validator';
+import { validateSaveToken } from '../bling.validator';
 import { logger } from '@/shared/utils/logger';
 
 @injectable()
@@ -17,9 +17,8 @@ export class BlingController {
   };
 
   callback = async (req: Request, res: Response) => {
-    const { code } = req.query;
-    console.log('CODE CONTROLLER', code)
-    await this.blingService.handleCallback(String(code));
+    const code = String(req.query.code ?? '');
+    await this.blingService.handleCallback(code);
     return res.json({
       success: true,
       message: 'Autenticação Bling realizada com sucesso.'
@@ -39,6 +38,16 @@ export class BlingController {
     return res.json({
       success: true,
       data: result
+    });
+  };
+
+  saveToken = async (req: Request, res: Response) => {
+    const input = validateSaveToken(req.body);
+    await this.blingService.manualSaveToken(input);
+    logger.success('Token Bling salvo manualmente');
+    return res.status(201).json({
+      success: true,
+      message: 'Token Bling salvo com sucesso.'
     });
   };
 }

@@ -1,0 +1,61 @@
+{
+    "data": {
+        "id": 18172903829,
+        "nome": "Tiago Oliveira",
+        "codigo": "",
+        "situacao": "A",
+        "numeroDocumento": "37690883877",
+        "telefone": "(11) 96418-6344",
+        "celular": "11964186344",
+        "fantasia": "",
+        "tipo": "F",
+        "indicadorIe": 9,
+        "ie": "",
+        "rg": "",
+        "inscricaoMunicipal": "",
+        "orgaoEmissor": "",
+        "email": "tiagocake@gmail.com",
+        "emailNotaFiscal": "tiagocake@gmail.com",
+        "endereco": {
+            "geral": {
+                "endereco": "Rua Ilhabela",
+                "cep": "09061000",
+                "bairro": "Vila Aquilino",
+                "municipio": "Santo André",
+                "uf": "SP",
+                "numero": "187",
+                "complemento": "Casa"
+            },
+            "cobranca": {
+                "endereco": "",
+                "cep": "",
+                "bairro": "",
+                "municipio": "",
+                "uf": "",
+                "numero": "",
+                "complemento": ""
+            }
+        },
+        "orgaoPublico": "",
+        "vendedor": {
+            "id": 0
+        },
+        "dadosAdicionais": {
+            "dataNascimento": "0000-00-00",
+            "sexo": "",
+            "naturalidade": ""
+        },
+        "financeiro": {
+            "limiteCredito": 0,
+            "condicaoPagamento": "",
+            "categoria": {
+                "id": 0
+            }
+        },
+        "pais": {
+            "nome": ""
+        },
+        "tiposContato": [],
+        "pessoasContato": []
+    }
+}

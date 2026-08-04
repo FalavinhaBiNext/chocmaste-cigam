@@ -33,72 +33,6 @@ export class BlingOAuthService {
     return { url: url.toString(), state: s };
   }
 
-  async acquireNewToken(code: string): Promise<void> {
-    const clientId = process.env.BLING_CLIENT_ID!;
-    const clientSecret = process.env.BLING_CLIENT_SECRET!;
-
-    logger.auth('Adquirindo novo token Bling...');
-
-    try {
-      const basicAuth = Buffer
-        .from(`${clientId}:${clientSecret}`)
-        .toString('base64');
-
-      const body = new URLSearchParams({
-        grant_type: 'authorization_code',
-        code
-      });
-
-      const response = await axios.post(this.BLING_TOKEN_URL, body, {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          Accept: 'application/json',
-          Authorization: `Basic ${basicAuth}`,
-          'enable-jwt': '1'
-        },
-        timeout: 15000
-      });
-
-      const {
-        access_token,
-        refresh_token,
-        expires_in,
-        scope,
-        token_type
-      } = response.data;
-
-      const expiresAt = new Date(
-        Date.now() + (expires_in || 3600) * 1000
-      );
-
-      await this.blingRepository.save({
-        access_token,
-        refresh_token,
-        expires_at: expiresAt,
-        scope: scope || 'all',
-        token_type: token_type || 'Bearer',
-        access_token_url: this.BLING_TOKEN_URL,
-        client_id: clientId,
-        client_secret: clientSecret,
-        active: true
-      });
-
-      logger.success('Novo token Bling salvo com sucesso');
-    } catch (error: any) {
-      logger.error('Erro ao adquirir novo token Bling', {
-        status: error.response?.status,
-        data: error.response?.data
-      });
-
-      throw new IntegrationError(
-        `Erro ao adquirir token Bling: ${error.response?.data?.error_description ||
-        error.response?.data?.error ||
-        error.message
-        }`
-      );
-    }
-  }
-
   async exchangeCode(code: string): Promise<void> {
     const clientId = process.env.BLING_CLIENT_ID!;
     const clientSecret = process.env.BLING_CLIENT_SECRET!;
@@ -115,8 +49,6 @@ export class BlingOAuthService {
         code
       });
 
-      console.log('PASSOU POR AQUI - ANTES DO POST PARA BLING')
-      
       const response = await axios.post(
         this.BLING_TOKEN_URL,
         body.toString(),
@@ -140,8 +72,6 @@ export class BlingOAuthService {
       
       const expiresAt = new Date(Date.now() + (expires_in || 3600) * 1000);
       
-      console.log('PASSOU POR AQUI - DEPOIS DO POST PARA BLING - ANTES DO SAVE')
-      
       await this.blingRepository.save({
         access_token,
         refresh_token,
@@ -156,17 +86,18 @@ export class BlingOAuthService {
 
       logger.success('Tokens Bling obtidos e armazenados com sucesso');
     } catch (error: any) {
+      const errorMsg = error.response?.data?.error_description ||
+        (typeof error.response?.data?.error === 'object'
+          ? JSON.stringify(error.response?.data?.error)
+          : error.response?.data?.error) ||
+        error.message;
+
       logger.error('Falha ao trocar código por tokens Bling', {
         status: error.response?.status,
         data: error.response?.data
       });
 
-      throw new IntegrationError(
-        `Falha ao obter tokens Bling: ${error.response?.data?.error_description ||
-        error.response?.data?.error ||
-        error.message
-        }`
-      );
+      throw new IntegrationError(`Falha ao obter tokens Bling: ${errorMsg}`);
     }
   }
 
@@ -179,16 +110,26 @@ export class BlingOAuthService {
     logger.auth('Renovando token de acesso Bling...');
 
     try {
-      const response = await axios.post(this.BLING_TOKEN_URL, null, {
-        params: {
-          grant_type: 'refresh_token',
-          refresh_token: token.refresh_token,
-          client_id: token.client_id,
-          client_secret: token.client_secret
-        },
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        timeout: 15000
+      const basicAuth = Buffer
+        .from(`${token.client_id}:${token.client_secret}`)
+        .toString('base64');
+
+      const body = new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: token.refresh_token
       });
+
+      const response = await axios.post(
+        this.BLING_TOKEN_URL,
+        body.toString(),
+        {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            Authorization: `Basic ${basicAuth}`
+          },
+          timeout: 15000
+        }
+      );
 
       const { access_token, refresh_token, expires_in, scope, token_type } = response.data;
 
@@ -205,13 +146,17 @@ export class BlingOAuthService {
 
       logger.success('Token de acesso Bling renovado com sucesso');
     } catch (error: any) {
+      const errorMsg = error.response?.data?.error_description ||
+        (typeof error.response?.data?.error === 'object'
+          ? JSON.stringify(error.response?.data?.error)
+          : error.response?.data?.error) ||
+        error.message;
+
       logger.error('Falha ao renovar token Bling', {
         status: error.response?.status,
         data: error.response?.data
       });
-      throw new IntegrationError(
-        `Falha ao renovar token Bling: ${error.response?.data?.error || error.message}`
-      );
+      throw new IntegrationError(`Falha ao renovar token Bling: ${errorMsg}`);
     }
   }
 }

@@ -1,12 +1,14 @@
 import { injectable } from 'tsyringe';
 import { Request, Response } from "express";
-import { validateCreateEvent } from "../events.validator";
+import { validateWebhookEvent } from "../events.validator";
 import { EventService } from "../services/eventService";
+import { WebhookService } from "../../bling/services/webhookService";
 
 @injectable()
 export class EventController {
     constructor(
-        private readonly eventService: EventService
+        private readonly eventService: EventService,
+        private readonly webhookService: WebhookService
     ) {}
 
     health = (_req: Request, res: Response) => {
@@ -20,13 +22,17 @@ export class EventController {
     }
 
     create = async (req: Request, res: Response) => {
-        const input = validateCreateEvent(req.body);
-        const event = await this.eventService.create(input);
+        const input = validateWebhookEvent(req.body);
+        
+        // Execute the full integration flow (fetches from Bling API, registers customer, carrier, items, saves to DB, integrates CIGAM)
+        const cigamPedidoId = await this.webhookService.processarPedidoCriado(input as any);
 
         res.status(201).json({
             success: true,
-            message: 'Event created successfully',
-            data: event
+            message: 'Event and order processed successfully',
+            data: {
+                codigoPedidoCigam: cigamPedidoId
+            }
         })
     }
 

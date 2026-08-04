@@ -1,0 +1,50 @@
+[
+  {
+    "headers": {
+      "host": "n8nbot.falavinhanext.com.br",
+      "user-agent": "bling-webhook",
+      "content-length": "409",
+      "accept-encoding": "gzip, br",
+      "cdn-loop": "cloudflare; loops=1",
+      "cf-connecting-ip": "98.85.207.13",
+      "cf-ipcountry": "US",
+      "cf-ray": "a0c9af997eb0200f-IAD",
+      "cf-visitor": "{\"scheme\":\"https\"}",
+      "content-type": "application/json",
+      "x-bling-signature-256": "sha256=8636b5385d22d4441c2575455c64314ac14b94c033d79b2c430f64d5a872f4ee",
+      "x-forwarded-for": "172.71.223.34",
+      "x-forwarded-host": "n8nbot.falavinhanext.com.br",
+      "x-forwarded-port": "443",
+      "x-forwarded-proto": "https",
+      "x-forwarded-server": "936482fe06e9",
+      "x-real-ip": "172.71.223.34"
+    },
+    "params": {},
+    "query": {},
+    "body": {
+      "eventId": "019ed052-fa8c-798d-a919-6260e0f822ff",
+      "date": "2026-06-16T12:05:59Z",
+      "version": "v1",
+      "event": "product.updated",
+      "companyId": "f46afdc1cc617537a402af81c928bd37",
+      "data": {
+        "id": 16665050902,
+        "nome": "Produto Teste Integração",
+        "codigo": "999999888",
+        "tipo": "P",
+        "situacao": "E",
+        "preco": 800,
+        "unidade": "Un",
+        "formato": "S",
+        "idProdutoPai": 0,
+        "categoria": {
+          "id": 1253559
+        },
+        "descricaoCurta": "",
+        "descricaoComplementar": ""
+      }
+    },
+    "webhookUrl": "https://n8nbot.falavinhanext.com.br/webhook/teste-gui-post",
+    "executionMode": "production"
+  }
+]

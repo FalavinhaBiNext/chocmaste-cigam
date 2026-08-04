@@ -3,6 +3,8 @@ import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
 import { BlingRepository } from "../repositories/blingRepository";
 import { BlingOAuthService } from "./blingOAuthService";
 import { logger } from '@/shared/utils/logger';
+import { BlingPedidoResponse } from '../dto/blingPedido.dto';
+import { BlingFormaPagamentoResponse } from '../dto';
 import {
   IntegrationError,
   UnauthorizedIntegrationError,
@@ -66,6 +68,14 @@ export class BlingHttpClient {
     return this.request<T>('PATCH', url, config, data);
   }
 
+  async getPedido(id: number): Promise<BlingPedidoResponse> {
+    return this.get<BlingPedidoResponse>(`/pedidos/vendas/${id}`);
+  }
+
+  async getFormaPagamentoById(id: number | string): Promise<BlingFormaPagamentoResponse> {
+    return this.get<BlingFormaPagamentoResponse>(`/formapagamento/${id}`);
+  }
+
   async delete<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
     return this.request<T>('DELETE', url, config);
   }
@@ -74,7 +84,9 @@ export class BlingHttpClient {
     method: string,
     url: string,
     config?: AxiosRequestConfig,
-    data?: any
+    data?: any,
+    retries = 3,
+    delayMs = 1000
   ): Promise<T> {
     const accessToken = await this.ensureValidToken();
 
@@ -115,6 +127,21 @@ export class BlingHttpClient {
         throw new UnauthorizedIntegrationError(
           'Token Bling inválido e renovação automática falhou.'
         );
+      }
+
+      if (error.response?.status === 429 && retries > 0) {
+        const retryAfterHeader = error.response?.headers?.['retry-after'];
+        const waitTime = retryAfterHeader
+          ? parseInt(retryAfterHeader, 10) * 1000
+          : delayMs;
+
+        logger.warn(
+          `[BLING API] Limite de requisições atingido (429) em ${method} ${url}. Aguardando ${waitTime}ms antes da retentativa. Tentativas restantes: ${retries}`
+        );
+
+        await new Promise((resolve) => setTimeout(resolve, waitTime));
+
+        return this.request<T>(method, url, config, data, retries - 1, delayMs * 2);
       }
 
       throw this.mapError(error);

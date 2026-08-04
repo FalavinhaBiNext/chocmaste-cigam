@@ -1,0 +1,27 @@
+{
+    "eventId": "019e82e6-8860-7827-ac9e-067af654e358",
+    "date": "2026-06-01T11:16:46Z",
+    "version": "v1",
+    "event": "order.created",
+    "companyId": "f46afdc1cc617537a402af81c928bd37",
+    "data": {
+        "id": 25957584103,
+        "data": "2026-06-01",
+        "numero": 70911,
+        "numeroLoja": "305609",
+        "total": 198.86,
+        "contato": {
+            "id": 18172903829
+        },
+        "vendedor": {
+            "id": 0
+        },
+        "loja": {
+            "id": 203345026
+        },
+        "situacao": {
+            "id": 6,
+            "valor": 0
+        }
+    }
+}

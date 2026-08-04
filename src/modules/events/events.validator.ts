@@ -14,8 +14,39 @@ export const createEventSchema = z.object({
 
 export type CreateEventInput = z.infer<typeof createEventSchema>;
 
+export const webhookEventSchema = z.object({
+  eventId: z.string().uuid().optional(),
+  date: z.string().optional(),
+  version: z.string().optional(),
+  event: z.string().min(1, 'Evento é obrigatório.'),
+  companyId: z.string().min(1, 'companyId é obrigatório.'),
+  data: z.object({
+    id: z.number({ message: 'pedido_id deve ser um número.' }),
+    data: z.string().optional(),
+    numero: z.number({ message: 'numero_pedido deve ser um número.' }),
+    numeroLoja: z.string({ message: 'numero_loja deve ser uma string.' }),
+    total: z.number({ message: 'total_pedido deve ser um número.' }),
+    contato: z.object({ id: z.number() }).optional(),
+    vendedor: z.object({ id: z.number() }).optional(),
+    loja: z.object({ id: z.number() }).optional(),
+    situacao: z.object({ id: z.number(), valor: z.number() }).optional(),
+  }),
+});
+
+export type WebhookEventInput = z.infer<typeof webhookEventSchema>;
+
 export function validateCreateEvent(input: unknown) {
   const result = createEventSchema.safeParse(input);
+
+  if (!result.success) {
+    throw new ValidationError('Dados inválidos.', result.error.flatten());
+  }
+
+  return result.data;
+}
+
+export function validateWebhookEvent(input: unknown) {
+  const result = webhookEventSchema.safeParse(input);
 
   if (!result.success) {
     throw new ValidationError('Dados inválidos.', result.error.flatten());

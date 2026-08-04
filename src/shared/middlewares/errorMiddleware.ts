@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { AppError } from '@/shared/errors/AppError';
+import { logger } from '@/shared/utils/logger';
 
 export function errorMiddleware(
   error: Error,
@@ -16,7 +17,7 @@ export function errorMiddleware(
     });
   }
 
-  console.error(error);
+  logger.error(error.message || 'Erro interno do servidor.');
 
   return res.status(500).json({
     error: {

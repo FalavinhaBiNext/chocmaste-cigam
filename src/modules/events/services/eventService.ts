@@ -4,6 +4,7 @@ import { ResponseEventDTO } from "../dto";
 import { logger } from "@/shared/utils/logger";
 import { NotFoundError } from "@/shared/errors/AppError";
 import { EventRepository } from "../repositories/eventRepository";
+import { randomUUID } from 'crypto';
 
 @injectable()
 export class EventService {
@@ -11,9 +12,21 @@ export class EventService {
         @inject(EventRepository) private readonly eventRepository: EventRepository
     ) {}
 
-    async create(data: CreateEventInput): Promise<ResponseEventDTO>{
+    async create(data: any): Promise<ResponseEventDTO>{
+        const id = randomUUID()
         logger.info('Starting event creation')
-        const event = await this.eventRepository.create(data)
+        logger.event('Performing data processing')
+        const payload = {
+            id: id,
+            event: data.event,
+            company_id: data.companyId,
+            data_pedido: data.data.data,
+            pedido_id: data.data.id,
+            numero_pedido: data.data.numero,
+            numero_loja: data.data.numeroLoja,
+            total_pedido: data.data.total
+        }
+        const event = await this.eventRepository.create(payload)
         logger.success('Event Created successfully')
         return event;
     }

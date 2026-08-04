@@ -1,0 +1,31 @@
+{
+        "Material": {
+            "Complemento": null,
+            "Configurador": null,
+            "Grupo": null,
+            "UnidadeMedida": null,
+            "Codigo": "3343                ",
+            "Descricao": "AQUECEDOR DE PAPINHA COM CONTROLE DIGITAL 4 EM 1            ",
+            "Tipo": "A",
+            "TipoDescricao": "Ativo",
+            "CodigoUnidadeMedida": "UN ",
+            "Criacao": "2025-04-24",
+            "Modificacao": "2025-04-24",
+            "CodigoGrupo": "MR ",
+            "CodigoSubGrupo": "14 ",
+            "CodigoEspecificacao1": "      ",
+            "CodigoEspecificacao2": "      ",
+            "CodigoEspecificacao3": "      ",
+            "UtilizaGrade": " ",
+            "GarantiaVenda": 0,
+            "Referencia": "                    ",
+            "CodigoConfigurador": "3343  ",
+            "Aplicacao": "                                                                                                                                                                                                                                                                                                             ",
+            "EstruturaComercial": false,
+            "ControlaNumeroSerie": false,
+            "CodigoContaGerencial": "                         "
+        },
+        "Imagem": "                                                            ",
+        "ImagemCDN": "",
+        "DescricaoCompleta": ""
+    }

@@ -1,0 +1,66 @@
+{
+    "data": {
+        "id": 6176393350,
+        "nome": "RODONAVES TRANSPORTES E ENCOMENDAS LTDA",
+        "codigo": "001",
+        "situacao": "A",
+        "numeroDocumento": "44914992001290",
+        "telefone": "",
+        "celular": "",
+        "fantasia": "Rodonaves",
+        "tipo": "J",
+        "indicadorIe": 1,
+        "ie": "701826226.00-59",
+        "rg": "",
+        "inscricaoMunicipal": "",
+        "orgaoEmissor": "",
+        "email": "",
+        "emailNotaFiscal": "",
+        "endereco": {
+            "geral": {
+                "endereco": "Rua Coronel Ranulfo Borges Nascimento",
+                "cep": "38041100",
+                "bairro": "",
+                "municipio": "Uberaba",
+                "uf": "MG",
+                "numero": "390",
+                "complemento": ""
+            },
+            "cobranca": {
+                "endereco": "",
+                "cep": "",
+                "bairro": "",
+                "municipio": "",
+                "uf": "",
+                "numero": "",
+                "complemento": ""
+            }
+        },
+        "orgaoPublico": "",
+        "vendedor": {
+            "id": 0
+        },
+        "dadosAdicionais": {
+            "dataNascimento": "0000-00-00",
+            "sexo": "",
+            "naturalidade": ""
+        },
+        "financeiro": {
+            "limiteCredito": 0,
+            "condicaoPagamento": "",
+            "categoria": {
+                "id": 0
+            }
+        },
+        "pais": {
+            "nome": ""
+        },
+        "tiposContato": [
+            {
+                "id": 6175354653,
+                "descricao": "Transportador"
+            }
+        ],
+        "pessoasContato": []
+    }
+}

@@ -20,7 +20,6 @@ export class BlingRepository implements IBlingTokenRepository {
   }
 
   async save(data: CreateBlingTokenDTO): Promise<ResponseBlingTokenDTO> {
-    console.log(data, "DATA REPOSITORY SAVE")
     const token = await BlingModel.create({
       access_token: data.access_token,
       refresh_token: data.refresh_token,
