@@ -6,12 +6,12 @@ export const callbackQuerySchema = z.object({
   state: z.string().optional()
 });
 
-export function validateCallbackQuery(params: unknown) {
-  const result = callbackQuerySchema.safeParse(params);
+export function validateCallbackQuery(req: any, _res: any, next: any) {
+  const result = callbackQuerySchema.safeParse(req.query);
   if (!result.success) {
     throw new ValidationError('Parâmetros inválidos no callback.', result.error.flatten());
   }
-  return result.data;
+  next();
 }
 
 export const saveTokenSchema = z.object({
