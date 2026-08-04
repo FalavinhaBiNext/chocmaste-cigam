@@ -4,20 +4,22 @@ import { validatePedidoWebhook } from '../blingWebhook.validator';
 
 describe('Bling Validators', () => {
   describe('validateCallbackQuery', () => {
+    const mockNext = () => {};
+
     it('accept valid input', () => {
-      expect(() => validateCallbackQuery({ code: 'abc123' })).not.toThrow();
+      expect(() => validateCallbackQuery({ query: { code: 'abc123' } }, {} as any, mockNext)).not.toThrow();
     });
 
     it('accept input with optional state', () => {
-      expect(() => validateCallbackQuery({ code: 'abc123', state: 'state-1' })).not.toThrow();
+      expect(() => validateCallbackQuery({ query: { code: 'abc123', state: 'state-1' } }, {} as any, mockNext)).not.toThrow();
     });
 
     it('reject missing code', () => {
-      expect(() => validateCallbackQuery({})).toThrow('Parâmetros inválidos no callback.');
+      expect(() => validateCallbackQuery({ query: {} }, {} as any, mockNext)).toThrow('Parâmetros inválidos no callback.');
     });
 
-    it('reject null', () => {
-      expect(() => validateCallbackQuery(null)).toThrow('Parâmetros inválidos no callback.');
+    it('reject null query', () => {
+      expect(() => validateCallbackQuery({ query: null }, {} as any, mockNext)).toThrow('Parâmetros inválidos no callback.');
     });
   });
 
