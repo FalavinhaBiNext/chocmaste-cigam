@@ -31,9 +31,9 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh && chown -R node:node /app && \
 USER node
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-  CMD curl -f http://localhost:${PORT:-3333}/api/v1/events/health || exit 1
+  CMD curl -f http://localhost:${PORT:-3000}/api/v1/events/health || exit 1
 
-EXPOSE 3333
+EXPOSE 3000
 
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["node", "-r", "tsconfig-paths/register", "dist/server.js"]
