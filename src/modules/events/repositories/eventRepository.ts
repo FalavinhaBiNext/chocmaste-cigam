@@ -62,4 +62,8 @@ export class EventRepository implements IEventRepository {
 
         return EventMapper.eventToDTO(event)
     }
+
+    async update(id: string, data: { cigam_sincronizado: boolean; cigam_pedido_id?: string | null }): Promise<void> {
+        await EventModel.update(data, { where: { id } });
+    }
 }

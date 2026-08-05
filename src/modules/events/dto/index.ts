@@ -18,6 +18,8 @@ export interface ResponseEventDTO {
     numero_pedido?: number;
     numero_loja: string;
     total_pedido: number;
+    cigam_sincronizado: boolean;
+    cigam_pedido_id: string | null;
     created_at: Date
 }
 
@@ -29,4 +31,6 @@ export interface UpdateEventDTO {
     numero_pedido?: string;
     numero_loja?: string;
     total_pedido?: number;
+    cigam_sincronizado?: boolean;
+    cigam_pedido_id?: string | null;
 }

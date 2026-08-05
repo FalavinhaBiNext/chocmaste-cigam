@@ -157,6 +157,14 @@ import { CigamMateriaisIntegradorService } from '@/modules/cigam/services/cigamM
 
 import { CigamMateriaisIntegradorController } from '@/modules/cigam/controllers/cigamMateriaisIntegradorController';
 
+import { UsuarioRepository } from '@/modules/auth/repositories/usuarioRepository';
+import { UsuarioService } from '@/modules/auth/services/usuarioService';
+import { UsuarioController } from '@/modules/auth/controllers/usuarioController';
+
+container.registerSingleton(UsuarioRepository);
+container.registerSingleton(UsuarioService);
+container.registerSingleton(UsuarioController);
+
 container.registerSingleton(CigamClienteService);
 container.registerSingleton(CigamTransportadoraService);
 container.registerSingleton(CigamPedidoService);

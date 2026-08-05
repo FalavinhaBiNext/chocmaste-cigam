@@ -115,15 +115,19 @@ export class WebhookService {
     }
 
     await delay();
-    await this.eventService.create(payload);
+    const eventoCriado = await this.eventService.create(payload);
 
     let cigamPedidoId: string | null = null;
+    let cigamSincronizado = false;
     try {
       cigamPedidoId = await this.cigamPedidoService.enviarPedido(data);
+      cigamSincronizado = true;
       logger.webhook('Pedido enviado e integrado com sucesso no CIGAM', { eventId: payload.eventId });
     } catch (cigamError: any) {
       logger.error(`Falha ao integrar pedido Bling #${data.numero} no CIGAM: ${cigamError.message}`);
     }
+
+    await this.eventService.updateCigamStatus(eventoCriado.id, cigamSincronizado, cigamPedidoId);
 
     logger.webhook('Pedido processado com sucesso', { eventId: payload.eventId, pedidoId: pedido.id });
     return cigamPedidoId;

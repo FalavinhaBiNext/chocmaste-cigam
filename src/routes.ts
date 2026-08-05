@@ -52,6 +52,9 @@ import { createTransportadorasCigamRoutes } from './modules/transportadorasCigam
 import { DeParaController } from './modules/depara/controllers/deparaController';
 import { createDeParaRoutes } from './modules/depara/routes/depara.routes';
 
+import { UsuarioController } from './modules/auth/controllers/usuarioController';
+import { createAuthRoutes } from './modules/auth/routes/auth.routes';
+
 const routes = Router();
 
 const eventController = container.resolve(EventController);
@@ -77,6 +80,7 @@ const transportadorasCigamController = container.resolve(TransportadorasCigamCon
 const deParaController = container.resolve(DeParaController)
 const cigamMateriaisIntegradorController = container.resolve(CigamMateriaisIntegradorController)
 const blingProdutoSyncController = container.resolve(BlingProdutoSyncController)
+const usuarioController = container.resolve(UsuarioController)
 
 routes.use('/events', createEventRoutes(eventController));
 routes.use('/bling', createBlingRoutes(blingController, blingTokenController));
@@ -99,5 +103,6 @@ routes.use('/transportadoras-cigam', createTransportadorasCigamRoutes(transporta
 routes.use('/depara', createDeParaRoutes(deParaController))
 routes.use('/bling/produto-sync', createBlingProdutoSyncRoutes(blingProdutoSyncController))
 routes.use('/cigam/materiais-integrador', createCigamMateriaisIntegradorRoutes(cigamMateriaisIntegradorController))
+routes.use('/auth', createAuthRoutes(usuarioController))
 
 export { routes }

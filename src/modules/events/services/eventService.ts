@@ -70,4 +70,9 @@ export class EventService {
         logger.finish('Event found...')
         return event
     }
+
+    async updateCigamStatus(id: string, cigamSincronizado: boolean, cigamPedidoId?: string | null): Promise<void>{
+        await this.eventRepository.update(id, { cigam_sincronizado: cigamSincronizado, cigam_pedido_id: cigamPedidoId })
+        logger.success(`Evento ${id} atualizado: cigam_sincronizado=${cigamSincronizado}`)
+    }
 }

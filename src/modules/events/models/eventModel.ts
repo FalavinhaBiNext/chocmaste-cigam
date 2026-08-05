@@ -10,6 +10,8 @@ export class EventModel extends Model {
     public numero_pedido!: number;
     public numero_loja!: string;
     public total_pedido!: number;
+    public cigam_sincronizado!: boolean;
+    public cigam_pedido_id!: string | null;
     public readonly created_at!: Date;
     public readonly updated_at!: Date;
 }
@@ -47,6 +49,15 @@ EventModel.init({
       total_pedido: {
         type: Sequelize.FLOAT,
         allowNull: false
+      },
+      cigam_sincronizado: {
+        type: Sequelize.BOOLEAN,
+        allowNull: false,
+        defaultValue: false
+      },
+      cigam_pedido_id: {
+        type: Sequelize.STRING,
+        allowNull: true
       }
 }, {
     sequelize,
