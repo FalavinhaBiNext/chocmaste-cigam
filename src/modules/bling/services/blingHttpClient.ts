@@ -12,7 +12,8 @@ import {
   BadGatewayError,
   NotFoundError,
   ConflictError,
-  ValidationError
+  ValidationError,
+  RefreshTokenExpiredError
 } from '@/shared/errors/AppError';
 
 @injectable()
@@ -41,6 +42,14 @@ export class BlingHttpClient {
 
     const now = new Date();
     const expiresAt = token.expires_at ? new Date(token.expires_at) : null;
+    const timeUntilExpiry = expiresAt ? expiresAt.getTime() - now.getTime() : null;
+
+    logger.auth('Verificando validade do token Bling', {
+      hasToken: true,
+      expiresAt: expiresAt?.toISOString(),
+      timeUntilExpiryMs: timeUntilExpiry,
+      timeUntilExpiryMinutes: timeUntilExpiry ? Math.round(timeUntilExpiry / 60000) : null,
+    });
 
     if (expiresAt && expiresAt.getTime() - now.getTime() < 5 * 60 * 1000) {
       logger.auth('Token Bling expirado ou prestes a expirar. Renovando...');
@@ -88,7 +97,16 @@ export class BlingHttpClient {
     retries = 3,
     delayMs = 1000
   ): Promise<T> {
-    const accessToken = await this.ensureValidToken();
+    let accessToken: string;
+    try {
+      accessToken = await this.ensureValidToken();
+    } catch (error) {
+      // Propaga RefreshTokenExpiredError diretamente
+      if (error instanceof RefreshTokenExpiredError) {
+        throw error;
+      }
+      throw error;
+    }
 
     try {
       const response = await this.client.request<T>({
@@ -108,20 +126,30 @@ export class BlingHttpClient {
         logger.auth('Token Bling rejeitado (401). Tentando renovar...');
         const token = await this.blingRepository.findActive();
         if (token) {
-          await this.blingOAuthService.refreshAccessToken(token.id);
-          const refreshedToken = await this.blingRepository.findActive();
-          if (refreshedToken) {
-            const retryResponse = await this.client.request<T>({
-              method,
-              url,
-              data,
-              ...config,
-              headers: {
-                ...config?.headers,
-                Authorization: `Bearer ${refreshedToken.access_token}`
-              }
-            });
-            return retryResponse.data;
+          try {
+            await this.blingOAuthService.refreshAccessToken(token.id);
+            const refreshedToken = await this.blingRepository.findActive();
+            if (refreshedToken) {
+              const retryResponse = await this.client.request<T>({
+                method,
+                url,
+                data,
+                ...config,
+                headers: {
+                  ...config?.headers,
+                  Authorization: `Bearer ${refreshedToken.access_token}`
+                }
+              });
+              return retryResponse.data;
+            }
+          } catch (refreshError) {
+            // Propaga RefreshTokenExpiredError diretamente
+            if (refreshError instanceof RefreshTokenExpiredError) {
+              throw refreshError;
+            }
+            throw new UnauthorizedIntegrationError(
+              'Token Bling inválido e renovação automática falhou.'
+            );
           }
         }
         throw new UnauthorizedIntegrationError(

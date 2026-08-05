@@ -106,3 +106,12 @@ export class ValidationIntegrationError extends AppError {
     super(message, 422, details);
   }
 }
+
+export class RefreshTokenExpiredError extends AppError {
+  public readonly authUrl: string | null;
+
+  constructor(message = 'Refresh token expirado. É necessário autenticar novamente.', authUrl?: string) {
+    super(message, 401);
+    this.authUrl = authUrl || null;
+  }
+}

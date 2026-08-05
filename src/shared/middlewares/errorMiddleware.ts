@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { AppError } from '@/shared/errors/AppError';
+import { AppError, RefreshTokenExpiredError } from '@/shared/errors/AppError';
 import { logger } from '@/shared/utils/logger';
 
 export function errorMiddleware(
@@ -8,6 +8,16 @@ export function errorMiddleware(
   res: Response,
   next: NextFunction,
 ): Response {
+  if (error instanceof RefreshTokenExpiredError) {
+    return res.status(error.statusCode).json({
+      error: {
+        type: 'auth_required',
+        message: error.message,
+        authUrl: error.authUrl,
+      },
+    });
+  }
+
   if (error instanceof AppError) {
     return res.status(error.statusCode).json({
       error: {

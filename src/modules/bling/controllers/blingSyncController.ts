@@ -1,6 +1,7 @@
 import { inject, injectable } from 'tsyringe';
 import { Request, Response } from 'express';
 import { BlingSyncService } from '../services/blingSyncService';
+import { RefreshTokenExpiredError } from '@/shared/errors/AppError';
 
 @injectable()
 export class BlingSyncController {
@@ -25,7 +26,15 @@ export class BlingSyncController {
       const result = await this.blingSyncService.syncProdutos(sendProgress);
       res.write(`data: ${JSON.stringify({ type: 'done', result })}\n\n`);
     } catch (err: any) {
-      res.write(`data: ${JSON.stringify({ type: 'error', message: err.message })}\n\n`);
+      if (err instanceof RefreshTokenExpiredError) {
+        res.write(`data: ${JSON.stringify({
+          type: 'auth_required',
+          message: err.message,
+          authUrl: err.authUrl
+        })}\n\n`);
+      } else {
+        res.write(`data: ${JSON.stringify({ type: 'error', message: err.message })}\n\n`);
+      }
     } finally {
       res.end();
     }
@@ -37,7 +46,15 @@ export class BlingSyncController {
       const result = await this.blingSyncService.syncClientes(sendProgress);
       res.write(`data: ${JSON.stringify({ type: 'done', result })}\n\n`);
     } catch (err: any) {
-      res.write(`data: ${JSON.stringify({ type: 'error', message: err.message })}\n\n`);
+      if (err instanceof RefreshTokenExpiredError) {
+        res.write(`data: ${JSON.stringify({
+          type: 'auth_required',
+          message: err.message,
+          authUrl: err.authUrl
+        })}\n\n`);
+      } else {
+        res.write(`data: ${JSON.stringify({ type: 'error', message: err.message })}\n\n`);
+      }
     } finally {
       res.end();
     }
@@ -49,7 +66,15 @@ export class BlingSyncController {
       const result = await this.blingSyncService.syncFormasPagamento(sendProgress);
       res.write(`data: ${JSON.stringify({ type: 'done', result })}\n\n`);
     } catch (err: any) {
-      res.write(`data: ${JSON.stringify({ type: 'error', message: err.message })}\n\n`);
+      if (err instanceof RefreshTokenExpiredError) {
+        res.write(`data: ${JSON.stringify({
+          type: 'auth_required',
+          message: err.message,
+          authUrl: err.authUrl
+        })}\n\n`);
+      } else {
+        res.write(`data: ${JSON.stringify({ type: 'error', message: err.message })}\n\n`);
+      }
     } finally {
       res.end();
     }
@@ -61,7 +86,15 @@ export class BlingSyncController {
       const result = await this.blingSyncService.syncTransportadoras(sendProgress);
       res.write(`data: ${JSON.stringify({ type: 'done', result })}\n\n`);
     } catch (err: any) {
-      res.write(`data: ${JSON.stringify({ type: 'error', message: err.message })}\n\n`);
+      if (err instanceof RefreshTokenExpiredError) {
+        res.write(`data: ${JSON.stringify({
+          type: 'auth_required',
+          message: err.message,
+          authUrl: err.authUrl
+        })}\n\n`);
+      } else {
+        res.write(`data: ${JSON.stringify({ type: 'error', message: err.message })}\n\n`);
+      }
     } finally {
       res.end();
     }
@@ -73,7 +106,15 @@ export class BlingSyncController {
       const results = await this.blingSyncService.syncAll(sendProgress);
       res.write(`data: ${JSON.stringify({ type: 'done', result: results })}\n\n`);
     } catch (err: any) {
-      res.write(`data: ${JSON.stringify({ type: 'error', message: err.message })}\n\n`);
+      if (err instanceof RefreshTokenExpiredError) {
+        res.write(`data: ${JSON.stringify({
+          type: 'auth_required',
+          message: err.message,
+          authUrl: err.authUrl
+        })}\n\n`);
+      } else {
+        res.write(`data: ${JSON.stringify({ type: 'error', message: err.message })}\n\n`);
+      }
     } finally {
       res.end();
     }

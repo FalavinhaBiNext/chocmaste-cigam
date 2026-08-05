@@ -4,7 +4,7 @@ import crypto from 'crypto';
 import { BlingRepository } from "../repositories/blingRepository";
 import { BlingAuthUrlDTO } from "../dto";
 import { logger } from '@/shared/utils/logger';
-import { IntegrationError } from '@/shared/errors/AppError';
+import { IntegrationError, RefreshTokenExpiredError } from '@/shared/errors/AppError';
 
 @injectable()
 export class BlingOAuthService {
@@ -56,12 +56,21 @@ export class BlingOAuthService {
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
             Authorization: `Basic ${basicAuth}`,
-            'enable-jwt': '1'
           },
           timeout: 15000
         }
       );
-      
+
+      logger.auth('Resposta completa do Bling', {
+        responseKeys: Object.keys(response.data || {}),
+        hasAccessToken: !!response.data?.access_token,
+        hasRefreshToken: !!response.data?.refresh_token,
+        expiresInRaw: response.data?.expires_in,
+        expiresInType: typeof response.data?.expires_in,
+        scope: response.data?.scope,
+        tokenType: response.data?.token_type,
+      });
+
       const {
         access_token,
         refresh_token,
@@ -69,8 +78,17 @@ export class BlingOAuthService {
         scope,
         token_type
       } = response.data;
-      
-      const expiresAt = new Date(Date.now() + (expires_in || 3600) * 1000);
+
+      // Bling pode retornar expires_in em segundos (padrão) ou milissegundos
+      // Se o valor for muito grande (> 100000), provavelmente já está em milissegundos
+      const expiresInMs = expires_in > 100000 ? expires_in : (expires_in || 3600) * 1000;
+      const expiresAt = new Date(Date.now() + expiresInMs);
+      logger.auth('Token calculado com expiração', {
+        expiresAt: expiresAt.toISOString(),
+        expiresInSeconds: expires_in,
+        calculatedMs: expiresInMs,
+        isAlreadyMs: expires_in > 100000,
+      });
 
       const existing = await this.blingRepository.findActive();
       if (existing) {
@@ -157,10 +175,25 @@ export class BlingOAuthService {
 
       logger.success('Token de acesso Bling renovado com sucesso');
     } catch (error: any) {
-      const errorMsg = error.response?.data?.error_description ||
-        (typeof error.response?.data?.error === 'object'
-          ? JSON.stringify(error.response?.data?.error)
-          : error.response?.data?.error) ||
+      const errorData = error.response?.data?.error;
+      const errorDescription = error.response?.data?.error_description;
+
+      // Detecta refresh token expirado
+      if (errorData?.type === 'invalid_grant' || errorDescription === 'Refresh token has expired') {
+        const { url: authUrl } = this.generateAuthURL();
+        logger.error('Refresh token Bling expirado. É necessário autenticar novamente.', {
+          authUrl
+        });
+        throw new RefreshTokenExpiredError(
+          'O token de acesso do Bling expirou. É necessário autenticar novamente na plataforma Bling.',
+          authUrl
+        );
+      }
+
+      const errorMsg = errorDescription ||
+        (typeof errorData === 'object'
+          ? JSON.stringify(errorData)
+          : errorData) ||
         error.message;
 
       logger.error('Falha ao renovar token Bling', {
