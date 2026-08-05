@@ -8,9 +8,16 @@ import { NotFoundError } from "@/shared/errors/AppError";
 @injectable()
 export class BlingRepository implements IBlingTokenRepository {
   async findActive(): Promise<ResponseBlingTokenDTO | null> {
-    const token = await BlingModel.findOne({ where: { active: true } });
+    const token = await BlingModel.findOne({
+      where: { active: true },
+      order: [['created_at', 'DESC']],
+    });
     if (!token) return null;
     return BlingMapper.tokenToDTO(token);
+  }
+
+  async deactivateAll(): Promise<void> {
+    await BlingModel.update({ active: false }, { where: { active: true } });
   }
 
   async findById(id: string): Promise<ResponseBlingTokenDTO | null> {

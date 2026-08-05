@@ -87,31 +87,22 @@ export class BlingOAuthService {
         expiresAt: expiresAt.toISOString(),
         expiresInSeconds: expires_in,
         calculatedMs: expiresInMs,
-        isAlreadyMs: expires_in > 100000,
       });
 
-      const existing = await this.blingRepository.findActive();
-      if (existing) {
-        await this.blingRepository.update(existing.id, {
-          access_token,
-          refresh_token,
-          expires_at: expiresAt,
-          scope: scope || 'all',
-          token_type: token_type || 'Bearer',
-        });
-      } else {
-        await this.blingRepository.save({
-          access_token,
-          refresh_token,
-          expires_at: expiresAt,
-          scope: scope || 'all',
-          token_type: token_type || 'Bearer',
-          access_token_url: this.BLING_TOKEN_URL,
-          client_id: clientId,
-          client_secret: clientSecret,
-          active: true
-        });
-      }
+      // Desativa todos os tokens antigos antes de salvar o novo
+      await this.blingRepository.deactivateAll();
+
+      await this.blingRepository.save({
+        access_token,
+        refresh_token,
+        expires_at: expiresAt,
+        scope: scope || 'all',
+        token_type: token_type || 'Bearer',
+        access_token_url: this.BLING_TOKEN_URL,
+        client_id: clientId,
+        client_secret: clientSecret,
+        active: true
+      });
 
       logger.success('Tokens Bling obtidos e armazenados com sucesso');
     } catch (error: any) {
