@@ -59,7 +59,7 @@ export class CigamPedidoService {
     // 4. Resolução dos Itens (Produtos) e validação dos De-Paras
     const itensMapeados = [];
     for (const item of pedidoBling.itens) {
-      const idProdutoBling = String(item.id);
+      const idProdutoBling = String(item.produto?.id || item.id);
       const mapProduto = await this.deParaProdutosRepo.findByIdBling(idProdutoBling);
       if (!mapProduto) {
         throw new Error(`Produto "${item.descricao}" (ID Bling: ${idProdutoBling}) não possui mapeamento De-Para para o CIGAM.`);
