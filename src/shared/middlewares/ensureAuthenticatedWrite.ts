@@ -8,6 +8,7 @@ const PUBLIC_PATHS = [
     '/auth/register',
     '/events/health',
     '/bling/callback',
+    '/bling/webhook',
 ];
 
 interface TokenPayload {
