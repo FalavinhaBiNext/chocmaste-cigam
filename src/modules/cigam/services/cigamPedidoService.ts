@@ -33,13 +33,13 @@ export class CigamPedidoService {
 
     // 1. Resolução do Cliente (obter ou criar dinamicamente)
     const idClienteBling = String(pedidoBling.contato.id);
-    const idClienteCigam = await this.cigamClienteService.obterOuCriarCliente(idClienteBling);
+    const idClienteCigam = (await this.cigamClienteService.obterOuCriarCliente(idClienteBling)).trim();
 
     // 2. Resolução da Transportadora (obter ou criar dinamicamente)
     let idTransportadoraCigam = '';
     if (pedidoBling.transporte?.contato?.id || pedidoBling.transportador?.id) {
       const idTranspBling = String(pedidoBling.transporte?.contato?.id || pedidoBling.transportador?.id);
-      idTransportadoraCigam = await this.cigamTransportadoraService.obterOuCriarTransportadora(idTranspBling);
+      idTransportadoraCigam = (await this.cigamTransportadoraService.obterOuCriarTransportadora(idTranspBling)).trim();
     }
 
     // 3. Resolução da Forma de Pagamento
@@ -52,7 +52,7 @@ export class CigamPedidoService {
         if (!mapForma) {
           throw new Error(`Forma de pagamento (ID Bling: ${idFormaBling}) não possui mapeamento De-Para para o CIGAM.`);
         }
-        idCondicaoPagamentoCigam = mapForma.id_cigam;
+        idCondicaoPagamentoCigam = mapForma.id_cigam.trim();
       }
     }
 
@@ -66,7 +66,7 @@ export class CigamPedidoService {
       }
       itensMapeados.push({
         idProdutoBling,
-        idMaterialCigam: mapProduto.id_cigam,
+        idMaterialCigam: mapProduto.id_cigam.trim(),
         quantidade: item.quantidade,
         valorUnitario: item.valor,
         valorTotal: item.valorTotal || (item.valor * item.quantidade)

@@ -54,7 +54,7 @@ export class DeParaService {
       const cigamMap = new Map<string, string>();
       for (const c of cigamItems) {
         if (c.id_cigam) {
-          cigamMap.set(normalize(c.id_cigam), c.id_cigam);
+          cigamMap.set(normalize(c.id_cigam), c.id_cigam.trim());
         }
       }
 
@@ -107,7 +107,7 @@ export class DeParaService {
       const cigamMap = new Map<string, string>();
       for (const c of cigamItems) {
         const doc = normalizeDoc(c.documento);
-        if (doc) cigamMap.set(doc, c.id_cigam);
+        if (doc) cigamMap.set(doc, c.id_cigam.trim());
       }
 
       for (const bling of blingItems) {
@@ -158,7 +158,7 @@ export class DeParaService {
 
       const cigamMap = new Map<string, string>();
       for (const c of cigamItems) {
-        cigamMap.set(normalize(c.descricao), c.id_cigam);
+        cigamMap.set(normalize(c.descricao), c.id_cigam.trim());
       }
 
       for (const bling of blingItems) {
@@ -210,7 +210,7 @@ export class DeParaService {
       const cigamMap = new Map<string, string>();
       for (const c of cigamItems) {
         const doc = normalizeDoc(c.documento);
-        if (doc) cigamMap.set(doc, c.id_cigam);
+        if (doc) cigamMap.set(doc, c.id_cigam.trim());
       }
 
       for (const bling of blingItems) {
@@ -282,11 +282,11 @@ export class DeParaService {
 
     const existing = await repo.findByIdBling(data.id_bling);
     if (existing) {
-      await existing.update({ id_cigam: data.id_cigam });
+      await existing.update({ id_cigam: data.id_cigam.trim() });
     } else {
       await repo.create({
         id_bling: data.id_bling,
-        id_cigam: data.id_cigam,
+        id_cigam: data.id_cigam.trim(),
         nome: data.nome,
       });
     }

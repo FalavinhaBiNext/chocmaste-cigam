@@ -11,6 +11,8 @@ export function createEventRoutes(controller: EventController): Router {
   router.get('/pedido/:pedido', asyncHandler(controller.findByPedido));
   router.get('/numero-pedido/:numero', asyncHandler(controller.findByNumeroPedido));
   router.get('/:id', asyncHandler(controller.findById));
+  router.post('/:id/retry-cigam', asyncHandler(controller.retryCigamSync));
+  router.delete('/:id', asyncHandler(controller.delete));
 
   return router;
 }

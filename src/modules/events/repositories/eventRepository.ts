@@ -66,4 +66,8 @@ export class EventRepository implements IEventRepository {
     async update(id: string, data: { cigam_sincronizado: boolean; cigam_pedido_id?: string | null }): Promise<void> {
         await EventModel.update(data, { where: { id } });
     }
+
+    async delete(id: string): Promise<void> {
+        await EventModel.destroy({ where: { id } });
+    }
 }

@@ -17,9 +17,11 @@ describe('EventController', () => {
   let svc: any;
 
   beforeEach(() => {
-    svc = { create: vi.fn(), findAll: vi.fn(), findById: vi.fn(), findByPedido: vi.fn(), findByNumeroPedido: vi.fn() };
+    svc = { create: vi.fn(), findAll: vi.fn(), findById: vi.fn(), findByPedido: vi.fn(), findByNumeroPedido: vi.fn(), delete: vi.fn() };
     const webhookSvc = {} as any;
-    ctrl = new EventController(svc as any, webhookSvc);
+    const blingHttpClient = {} as any;
+    const cigamPedidoService = {} as any;
+    ctrl = new EventController(svc as any, webhookSvc, blingHttpClient, cigamPedidoService);
   });
 
   it('health', () => {

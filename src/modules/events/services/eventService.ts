@@ -75,4 +75,13 @@ export class EventService {
         await this.eventRepository.update(id, { cigam_sincronizado: cigamSincronizado, cigam_pedido_id: cigamPedidoId })
         logger.success(`Evento ${id} atualizado: cigam_sincronizado=${cigamSincronizado}`)
     }
+
+    async delete(id: string): Promise<void>{
+        const event = await this.eventRepository.findById(id)
+        if(!event){
+            throw new NotFoundError(`Event with ID: ${id} not found`)
+        }
+        await this.eventRepository.delete(id)
+        logger.success(`Event ${id} deleted successfully`)
+    }
 }
