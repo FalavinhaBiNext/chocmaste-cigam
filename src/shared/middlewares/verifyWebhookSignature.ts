@@ -4,6 +4,9 @@ import { ValidationError } from '@/shared/errors/AppError';
 import { logger } from '@/shared/utils/logger';
 
 export function verifyWebhookSignature(req: Request, _res: Response, next: NextFunction): void {
+  console.log('📩 [WEBHOOK] Headers:', JSON.stringify(req.headers, null, 2));
+  console.log('📩 [WEBHOOK] Body:', JSON.stringify(req.body, null, 2));
+
   const signature = req.headers['x-bling-signature-256'] as string | undefined;
 
   if (!signature) {
@@ -20,7 +23,11 @@ export function verifyWebhookSignature(req: Request, _res: Response, next: NextF
     return;
   }
 
-  const rawBody = JSON.stringify(req.body);
+  const rawBody: Buffer | undefined = (req as any).rawBody;
+  if (!rawBody) {
+    logger.warn('Raw body não disponível para verificação de assinatura');
+    throw new ValidationError('Assinatura do webhook inválida.');
+  }
   const expectedSignature = createHmac('sha256', clientSecret)
     .update(rawBody)
     .digest('hex');

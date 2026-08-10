@@ -127,6 +127,7 @@ export class CigamPedidoService {
       };
 
       logger.info(`Adicionando item (Material CIGAM: ${item.idMaterialCigam}) ao pedido CIGAM #${codigoPedidoCigam}...`);
+      logger.info('Payload do item CIGAM', payloadItem);
       await this.cigamHttpClient.post(
         baseUrl,
         ambiente,
