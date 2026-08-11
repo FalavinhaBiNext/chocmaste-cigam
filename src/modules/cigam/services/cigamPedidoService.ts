@@ -91,12 +91,28 @@ export class CigamPedidoService {
       prazo = pedidoBling.data;
     }
 
+    const valorFrete = pedidoBling.transporte?.frete ?? 0;
+    const descontoValor = typeof pedidoBling.desconto === 'object' && pedidoBling.desconto !== null
+      ? (pedidoBling.desconto.valor ?? 0)
+      : (Number(pedidoBling.desconto) || 0);
+
+    const partesObservacao: string[] = [`Bling Pedido #${pedidoBling.numero}`];
+    if (pedidoBling.observacoes) {
+      partesObservacao.push(pedidoBling.observacoes);
+    }
+    if (descontoValor > 0) {
+      partesObservacao.push(`Desconto: ${descontoValor.toFixed(2).replace('.', ',')}`);
+    }
+    if (valorFrete > 0) {
+      partesObservacao.push(`Frete: ${valorFrete.toFixed(2).replace('.', ',')}`);
+    }
+
     const payloadCapa = {
       CodigoCliente: idClienteCigam,
       DataPedido: pedidoBling.data,
       CodigoCondicaoPagamento: idCondicaoPagamentoCigam,
       CodigoTransportadora: idTransportadoraCigam,
-      Observacao: `Bling Pedido #${pedidoBling.numero} - ${pedidoBling.observacoes || ''}`.toUpperCase(),
+      Observacao: partesObservacao.join(' - ').toUpperCase(),
       CopiarObservacoesCliente: true,
       PrazoEntrega: prazo,
       PrazoProgramado: prazo,
