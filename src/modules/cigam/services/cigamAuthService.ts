@@ -49,7 +49,7 @@ export class CigamAuthService {
           headers: {
             "Content-Type": "application/json"
           },
-          timeout: 15000
+          timeout: 60000, // 60 segundos para autenticação
         }
       );
 

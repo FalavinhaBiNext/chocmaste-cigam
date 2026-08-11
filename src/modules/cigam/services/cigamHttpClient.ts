@@ -20,7 +20,7 @@ export class CigamHttpClient {
     @inject(CigamRepository) private readonly cigamRepository: CigamRepository
   ) {
     this.client = axios.create({
-      timeout: 30000,
+      timeout: 600000, // 10 minutos — API CIGAM leva ~5min para retornar produtos
       headers: { 'Content-Type': 'application/json' }
     });
   }

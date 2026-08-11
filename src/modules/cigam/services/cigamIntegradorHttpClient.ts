@@ -17,7 +17,7 @@ export class CigamIntegradorHttpClient {
 
     this.client = axios.create({
       baseURL,
-      timeout: 30000,
+      timeout: 600000, // 10 minutos — API CIGAM pode demorar
       headers: { 'Content-Type': 'application/json' },
     });
 

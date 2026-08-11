@@ -99,7 +99,8 @@ export class CigamClienteService {
         Telefone: clienteBling.telefone || clienteBling.celular || '',
         Email: (clienteBling.email || '').toUpperCase(),
         Cep: clienteBling.cep ? clienteBling.cep.replace(/\D/g, '') : '',
-        Ativo: true
+        Ativo: true,
+        CodigoPais: '031'
       };
 
       try {
