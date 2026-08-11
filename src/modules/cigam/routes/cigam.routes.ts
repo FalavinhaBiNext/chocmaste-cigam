@@ -14,6 +14,7 @@ export function createCigamRoutes(
   router.get('/status', asyncHandler(controller.status));
   router.post('/token', asyncHandler(controller.saveToken));
   router.post('/sync', asyncHandler(controller.syncAll));
+  router.get('/sync/status/:jobId', asyncHandler(controller.syncStatus));
   router.post('/sync/produtos', asyncHandler(controller.syncProdutos));
   router.post('/sync/clientes', asyncHandler(controller.syncClientes));
   router.post('/sync/formas-pagamento', asyncHandler(controller.syncFormasPagamento));

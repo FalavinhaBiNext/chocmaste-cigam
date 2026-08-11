@@ -11,8 +11,20 @@ import { delay } from '@/shared/utils/delay';
 import { SyncResultDTO } from '../dto';
 import { CigamMaterialResponse, CigamPessoaResponse, CigamCondicaoPagamentoResponse } from './types';
 
+export interface SyncJobStatus {
+  id: string;
+  entity: string;
+  status: 'running' | 'completed' | 'failed';
+  startedAt: string;
+  finishedAt?: string;
+  result?: SyncResultDTO;
+  error?: string;
+}
+
 @injectable()
 export class CigamSyncService {
+  private activeJobs = new Map<string, SyncJobStatus>();
+
   constructor(
     @inject(CigamHttpClient) private readonly cigamHttpClient: CigamHttpClient,
     @inject(UsuarioCigamService) private readonly usuarioCigamService: UsuarioCigamService,
@@ -21,6 +33,56 @@ export class CigamSyncService {
     @inject(FormasPagamentoCigamService) private readonly formasPagamentoCigamService: FormasPagamentoCigamService,
     @inject(TransportadorasCigamService) private readonly transportadorasCigamService: TransportadorasCigamService,
   ) {}
+
+  getJobStatus(id: string): SyncJobStatus | undefined {
+    return this.activeJobs.get(id);
+  }
+
+  hasRunningJob(entity: string): boolean {
+    for (const job of this.activeJobs.values()) {
+      if (job.entity === entity && job.status === 'running') {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  getRunningJobId(entity: string): string | undefined {
+    for (const job of this.activeJobs.values()) {
+      if (job.entity === entity && job.status === 'running') {
+        return job.id;
+      }
+    }
+    return undefined;
+  }
+
+  startSyncInBackground(entity: string, syncFn: () => Promise<SyncResultDTO>): string {
+    const jobId = `sync_${entity}_${Date.now()}`;
+    const job: SyncJobStatus = {
+      id: jobId,
+      entity,
+      status: 'running',
+      startedAt: new Date().toISOString(),
+    };
+
+    this.activeJobs.set(jobId, job);
+
+    syncFn()
+      .then((result) => {
+        job.status = 'completed';
+        job.finishedAt = new Date().toISOString();
+        job.result = result;
+        logger.success(`Sync background ${entity} finalizado: ${result.created} criados, ${result.updated} atualizados`);
+      })
+      .catch((error) => {
+        job.status = 'failed';
+        job.finishedAt = new Date().toISOString();
+        job.error = error.message || 'Erro desconhecido';
+        logger.error(`Sync background ${entity} falhou: ${job.error}`);
+      });
+
+    return jobId;
+  }
 
   async syncAll(ambiente: string): Promise<SyncResultDTO> {
     logger.info(`Iniciando sync completo do Cigam para ambiente: ${ambiente}`);

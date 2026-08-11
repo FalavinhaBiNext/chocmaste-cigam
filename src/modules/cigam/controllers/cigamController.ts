@@ -77,60 +77,148 @@ export class CigamController {
   syncAll = async (req: Request, res: Response) => {
     const input = validateSync(req.body);
     const env = await this.getEnv(input.ambiente);
-    const result = await this.cigamSyncService.syncAll(env);
+
+    if (this.cigamSyncService.hasRunningJob('all')) {
+      const existingJobId = this.cigamSyncService.getRunningJobId('all');
+      res.status(200).json({
+        success: true,
+        message: 'Sincronização completa já em andamento.',
+        data: { jobId: existingJobId, status: 'running' },
+      });
+      return;
+    }
+
+    const jobId = this.cigamSyncService.startSyncInBackground(
+      'all',
+      () => this.cigamSyncService.syncAll(env),
+    );
+
+    res.status(202).json({
+      success: true,
+      message: 'Sincronização completa iniciada em background.',
+      data: { jobId, status: 'running' },
+    });
+  };
+
+  syncStatus = async (req: Request, res: Response) => {
+    const jobId = String(req.params.jobId);
+    const job = this.cigamSyncService.getJobStatus(jobId);
+
+    if (!job) {
+      res.status(404).json({
+        success: false,
+        message: 'Job de sincronização não encontrado.',
+      });
+      return;
+    }
 
     res.status(200).json({
       success: true,
-      message: 'Sincronização completa finalizada.',
-      data: result,
+      data: job,
     });
   };
 
   syncProdutos = async (req: Request, res: Response) => {
     const input = validateSync(req.body);
     const env = await this.getEnv(input.ambiente);
-    const result = await this.cigamSyncService.syncProdutos(env);
 
-    res.status(200).json({
+    if (this.cigamSyncService.hasRunningJob('produtos')) {
+      const existingJobId = this.cigamSyncService.getRunningJobId('produtos');
+      res.status(200).json({
+        success: true,
+        message: 'Sincronização de produtos já em andamento.',
+        data: { jobId: existingJobId, status: 'running' },
+      });
+      return;
+    }
+
+    const jobId = this.cigamSyncService.startSyncInBackground(
+      'produtos',
+      () => this.cigamSyncService.syncProdutos(env),
+    );
+
+    res.status(202).json({
       success: true,
-      message: 'Sincronização de produtos finalizada.',
-      data: result,
+      message: 'Sincronização de produtos iniciada em background.',
+      data: { jobId, status: 'running' },
     });
   };
 
   syncClientes = async (req: Request, res: Response) => {
     const input = validateSync(req.body);
     const env = await this.getEnv(input.ambiente);
-    const result = await this.cigamSyncService.syncClientes(env);
 
-    res.status(200).json({
+    if (this.cigamSyncService.hasRunningJob('clientes')) {
+      const existingJobId = this.cigamSyncService.getRunningJobId('clientes');
+      res.status(200).json({
+        success: true,
+        message: 'Sincronização de clientes já em andamento.',
+        data: { jobId: existingJobId, status: 'running' },
+      });
+      return;
+    }
+
+    const jobId = this.cigamSyncService.startSyncInBackground(
+      'clientes',
+      () => this.cigamSyncService.syncClientes(env),
+    );
+
+    res.status(202).json({
       success: true,
-      message: 'Sincronização de clientes finalizada.',
-      data: result,
+      message: 'Sincronização de clientes iniciada em background.',
+      data: { jobId, status: 'running' },
     });
   };
 
   syncFormasPagamento = async (req: Request, res: Response) => {
     const input = validateSync(req.body);
     const env = await this.getEnv(input.ambiente);
-    const result = await this.cigamSyncService.syncFormasPagamento(env);
 
-    res.status(200).json({
+    if (this.cigamSyncService.hasRunningJob('formas_pagamento')) {
+      const existingJobId = this.cigamSyncService.getRunningJobId('formas_pagamento');
+      res.status(200).json({
+        success: true,
+        message: 'Sincronização de formas de pagamento já em andamento.',
+        data: { jobId: existingJobId, status: 'running' },
+      });
+      return;
+    }
+
+    const jobId = this.cigamSyncService.startSyncInBackground(
+      'formas_pagamento',
+      () => this.cigamSyncService.syncFormasPagamento(env),
+    );
+
+    res.status(202).json({
       success: true,
-      message: 'Sincronização de formas de pagamento finalizada.',
-      data: result,
+      message: 'Sincronização de formas de pagamento iniciada em background.',
+      data: { jobId, status: 'running' },
     });
   };
 
   syncTransportadoras = async (req: Request, res: Response) => {
     const input = validateSync(req.body);
     const env = await this.getEnv(input.ambiente);
-    const result = await this.cigamSyncService.syncTransportadoras(env);
 
-    res.status(200).json({
+    if (this.cigamSyncService.hasRunningJob('transportadoras')) {
+      const existingJobId = this.cigamSyncService.getRunningJobId('transportadoras');
+      res.status(200).json({
+        success: true,
+        message: 'Sincronização de transportadoras já em andamento.',
+        data: { jobId: existingJobId, status: 'running' },
+      });
+      return;
+    }
+
+    const jobId = this.cigamSyncService.startSyncInBackground(
+      'transportadoras',
+      () => this.cigamSyncService.syncTransportadoras(env),
+    );
+
+    res.status(202).json({
       success: true,
-      message: 'Sincronização de transportadoras finalizada.',
-      data: result,
+      message: 'Sincronização de transportadoras iniciada em background.',
+      data: { jobId, status: 'running' },
     });
   };
 }
