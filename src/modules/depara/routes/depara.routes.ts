@@ -14,6 +14,12 @@ export function createDeParaRoutes(controller: DeParaController): Router {
   router.post('/manual', asyncHandler(controller.manualMap));
   router.get('/status', asyncHandler(controller.getStatus));
   router.get('/formas-pagamento/export-excel', asyncHandler(controller.exportFormasPagamento));
+
+  // Unidades de Negócio
+  router.get('/unidades-negocio', asyncHandler(controller.listUnidadesNegocio));
+  router.post('/unidades-negocio', asyncHandler(controller.createUnidadeNegocio));
+  router.delete('/unidades-negocio/:id', asyncHandler(controller.deleteUnidadeNegocio));
+
   router.get('/:entity', asyncHandler(controller.getAssociations));
   router.delete('/:entity/:id_bling', asyncHandler(controller.deleteAssociation));
 

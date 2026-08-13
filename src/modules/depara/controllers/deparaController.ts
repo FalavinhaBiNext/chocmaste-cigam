@@ -1,6 +1,7 @@
 import { inject, injectable } from 'tsyringe';
 import { Request, Response } from 'express';
 import { DeParaService } from '../services/deparaService';
+import { DeParaUnidadesNegocioRepository } from '../repositories/deparaUnidadesNegocioRepository';
 import {
   validateDeParaSync,
   validateDeParaManual,
@@ -11,7 +12,8 @@ import {
 @injectable()
 export class DeParaController {
   constructor(
-    @inject(DeParaService) private readonly deParaService: DeParaService
+    @inject(DeParaService) private readonly deParaService: DeParaService,
+    @inject(DeParaUnidadesNegocioRepository) private readonly deParaUnidadesNegocioRepo: DeParaUnidadesNegocioRepository
   ) {}
 
   health = (_req: Request, res: Response) => {
@@ -118,6 +120,45 @@ export class DeParaController {
     res.status(200).json({
       success: true,
       message: 'Associação excluída com sucesso.',
+    });
+  };
+
+  // Unidades de Negócio
+  listUnidadesNegocio = async (_req: Request, res: Response) => {
+    const result = await this.deParaUnidadesNegocioRepo.findAll();
+    res.status(200).json({
+      success: true,
+      data: result,
+    });
+  };
+
+  createUnidadeNegocio = async (req: Request, res: Response) => {
+    const { company_id_bling, unidade_negocio, nome } = req.body;
+    if (!company_id_bling || !unidade_negocio || !nome) {
+      res.status(400).json({
+        success: false,
+        message: 'company_id_bling, unidade_negocio e nome são obrigatórios.',
+      });
+      return;
+    }
+    const result = await this.deParaUnidadesNegocioRepo.create({
+      company_id_bling,
+      unidade_negocio,
+      nome,
+    });
+    res.status(201).json({
+      success: true,
+      message: 'Mapeamento de unidade de negócio criado com sucesso.',
+      data: result,
+    });
+  };
+
+  deleteUnidadeNegocio = async (req: Request, res: Response) => {
+    const id = String(req.params.id);
+    await this.deParaUnidadesNegocioRepo.deleteById(id);
+    res.status(200).json({
+      success: true,
+      message: 'Mapeamento de unidade de negócio excluído com sucesso.',
     });
   };
 }
