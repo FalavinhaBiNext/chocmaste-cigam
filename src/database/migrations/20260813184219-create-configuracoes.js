@@ -1,5 +1,7 @@
 'use strict';
 
+const crypto = require('crypto');
+
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
   async up (queryInterface, Sequelize) {
@@ -35,7 +37,7 @@ module.exports = {
 
     // Insert default config
     await queryInterface.bulkInsert('configuracoes', [{
-      id: Sequelize.UUIDV4,
+      id: crypto.randomUUID(),
       chave: 'envio_automatico_cigam',
       valor: 'true',
       descricao: 'Ativar ou desativar o envio automático de pedidos para o CIGAM',
