@@ -182,4 +182,14 @@ container.registerSingleton(ConfiguracoesRepository);
 container.registerSingleton(ConfiguracoesService);
 container.registerSingleton(ConfiguracoesController);
 
+import { MercadoLivreTokenRepository } from '@/modules/mercadoLivre/repositories/mercadoLivreTokenRepository';
+import { MercadoLivreAuthService } from '@/modules/mercadoLivre/services/mercadoLivreAuthService';
+import { MercadoLivreHttpClient } from '@/modules/mercadoLivre/services/mercadoLivreHttpClient';
+import { MercadoLivreController } from '@/modules/mercadoLivre/controllers/mercadoLivreController';
+
+container.registerSingleton(MercadoLivreTokenRepository);
+container.registerSingleton(MercadoLivreAuthService);
+container.registerSingleton(MercadoLivreHttpClient);
+container.registerSingleton(MercadoLivreController);
+
 export { container };

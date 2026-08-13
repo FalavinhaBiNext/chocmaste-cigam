@@ -55,6 +55,9 @@ import { createDeParaRoutes } from './modules/depara/routes/depara.routes';
 import { ConfiguracoesController } from './modules/configuracoes/controllers/configuracoesController';
 import { createConfiguracoesRoutes } from './modules/configuracoes/routes/configuracoes.routes';
 
+import { MercadoLivreController } from './modules/mercadoLivre/controllers/mercadoLivreController';
+import { createMercadoLivreRoutes } from './modules/mercadoLivre/routes/mercadoLivre.routes';
+
 import { UsuarioController } from './modules/auth/controllers/usuarioController';
 import { createAuthRoutes } from './modules/auth/routes/auth.routes';
 
@@ -84,6 +87,7 @@ const deParaController = container.resolve(DeParaController)
 const cigamMateriaisIntegradorController = container.resolve(CigamMateriaisIntegradorController)
 const blingProdutoSyncController = container.resolve(BlingProdutoSyncController)
 const configuracoesController = container.resolve(ConfiguracoesController)
+const mercadoLivreController = container.resolve(MercadoLivreController)
 const usuarioController = container.resolve(UsuarioController)
 
 routes.use('/events', createEventRoutes(eventController));
@@ -108,6 +112,7 @@ routes.use('/depara', createDeParaRoutes(deParaController))
 routes.use('/bling/produto-sync', createBlingProdutoSyncRoutes(blingProdutoSyncController))
 routes.use('/cigam/materiais-integrador', createCigamMateriaisIntegradorRoutes(cigamMateriaisIntegradorController))
 routes.use('/configuracoes', createConfiguracoesRoutes(configuracoesController))
+routes.use('/mercado-livre', createMercadoLivreRoutes(mercadoLivreController))
 routes.use('/auth', createAuthRoutes(usuarioController))
 
 export { routes }
