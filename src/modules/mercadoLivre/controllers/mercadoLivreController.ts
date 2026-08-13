@@ -15,25 +15,22 @@ export class MercadoLivreController {
 
   /**
    * Gera a URL de autorização para o usuário redirecionar ao ML.
-   * GET /mercado-livre/auth-url?appId=xxx&redirectUri=xxx
+   * GET /mercado-livre/auth-url
    */
-  getAuthUrl = async (req: Request, res: Response) => {
-    const { appId, redirectUri } = req.query;
+  getAuthUrl = async (_req: Request, res: Response) => {
+    const appId = process.env.ML_APP_ID;
+    const redirectUri = process.env.ML_REDIRECT_URI;
 
     if (!appId || !redirectUri) {
-      res.status(400).json({
+      res.status(500).json({
         success: false,
-        message: 'appId e redirectUri são obrigatórios.',
+        message: 'ML_APP_ID e ML_REDIRECT_URI não configurados no servidor.',
       });
       return;
     }
 
     const state = Math.random().toString(36).substring(2, 15);
-    const authUrl = this.authService.generateAuthURL(
-      String(appId),
-      String(redirectUri),
-      state,
-    );
+    const authUrl = this.authService.generateAuthURL(appId, redirectUri, state);
 
     res.status(200).json({
       success: true,
@@ -46,7 +43,7 @@ export class MercadoLivreController {
    * GET /mercado-livre/callback?code=xxx&state=xxx
    */
   handleCallback = async (req: Request, res: Response) => {
-    const { code, state, app_id, client_secret, redirect_uri } = req.query;
+    const { code } = req.query;
 
     if (!code) {
       res.status(400).json({
@@ -56,10 +53,14 @@ export class MercadoLivreController {
       return;
     }
 
-    if (!app_id || !client_secret || !redirect_uri) {
-      res.status(400).json({
+    const appId = process.env.ML_APP_ID;
+    const clientSecret = process.env.ML_CLIENT_SECRET;
+    const redirectUri = process.env.ML_REDIRECT_URI;
+
+    if (!appId || !clientSecret || !redirectUri) {
+      res.status(500).json({
         success: false,
-        message: 'app_id, client_secret e redirect_uri são obrigatórios como query params.',
+        message: 'ML_APP_ID, ML_CLIENT_SECRET e ML_REDIRECT_URI não configurados no servidor.',
       });
       return;
     }
@@ -67,9 +68,9 @@ export class MercadoLivreController {
     try {
       const tokenData = await this.authService.exchangeCodeForToken(
         String(code),
-        String(app_id),
-        String(client_secret),
-        String(redirect_uri),
+        appId,
+        clientSecret,
+        redirectUri,
       );
 
       res.status(200).json({
