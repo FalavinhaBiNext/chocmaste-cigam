@@ -16,6 +16,7 @@ import { FormaPagamentoBlingService } from './formaPagamentoBlingService';
 import { CigamPedidoService } from '@/modules/cigam/services/cigamPedidoService';
 import { BlingRepository } from '../repositories/blingRepository';
 import { DeParaUnidadesNegocioRepository } from '@/modules/depara/repositories/deparaUnidadesNegocioRepository';
+import { ConfiguracoesService } from '@/modules/configuracoes/services/configuracoesService';
 
 @injectable()
 export class WebhookService {
@@ -33,6 +34,7 @@ export class WebhookService {
     @inject(CigamPedidoService) private readonly cigamPedidoService: CigamPedidoService,
     @inject(BlingRepository) private readonly blingRepository: BlingRepository,
     @inject(DeParaUnidadesNegocioRepository) private readonly deParaUnidadesNegocioRepo: DeParaUnidadesNegocioRepository,
+    @inject(ConfiguracoesService) private readonly configuracoesService: ConfiguracoesService,
   ) {}
 
   async processarPedidoCriado(payload: PedidoWebhookInput): Promise<string | null> {
@@ -180,12 +182,18 @@ export class WebhookService {
 
     let cigamPedidoId: string | null = null;
     let cigamSincronizado = false;
-    try {
-      cigamPedidoId = await this.cigamPedidoService.enviarPedido(data, unidadeNegocio);
-      cigamSincronizado = true;
-      logger.webhook('Pedido enviado e integrado com sucesso no CIGAM', { eventId: payload.eventId });
-    } catch (cigamError: any) {
-      logger.error(`Falha ao integrar pedido Bling #${data.numero} no CIGAM: ${cigamError.message}`);
+
+    const envioAutomaticoAtivo = await this.configuracoesService.getEnvioAutomaticoCigam();
+    if (!envioAutomaticoAtivo) {
+      logger.webhook('Envio automático para CIGAM está desativado. Pulando integração.', { eventId: payload.eventId });
+    } else {
+      try {
+        cigamPedidoId = await this.cigamPedidoService.enviarPedido(data, unidadeNegocio);
+        cigamSincronizado = true;
+        logger.webhook('Pedido enviado e integrado com sucesso no CIGAM', { eventId: payload.eventId });
+      } catch (cigamError: any) {
+        logger.error(`Falha ao integrar pedido Bling #${data.numero} no CIGAM: ${cigamError.message}`);
+      }
     }
 
     await this.eventService.updateCigamStatus(eventoCriado.id, cigamSincronizado, cigamPedidoId);

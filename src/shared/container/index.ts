@@ -174,4 +174,12 @@ container.registerSingleton(CigamIntegradorHttpClient);
 container.registerSingleton(CigamMateriaisIntegradorService);
 container.registerSingleton(CigamMateriaisIntegradorController);
 
+import { ConfiguracoesRepository } from '@/modules/configuracoes/repositories/configuracoesRepository';
+import { ConfiguracoesService } from '@/modules/configuracoes/services/configuracoesService';
+import { ConfiguracoesController } from '@/modules/configuracoes/controllers/configuracoesController';
+
+container.registerSingleton(ConfiguracoesRepository);
+container.registerSingleton(ConfiguracoesService);
+container.registerSingleton(ConfiguracoesController);
+
 export { container };
