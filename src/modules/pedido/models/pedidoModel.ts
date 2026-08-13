@@ -21,6 +21,8 @@ export class PedidoModel extends Model {
   public valor_frete!: number;
   public nome_transportadora!: string;
   public codigo_rastreio!: string;
+  public unidade_negocio!: string | null;
+  public data_prevista!: string | null;
   public readonly created_at!: Date;
   public readonly updated_at!: Date;
 }
@@ -103,6 +105,14 @@ PedidoModel.init({
   codigo_rastreio: {
     type: Sequelize.STRING,
     allowNull: false
+  },
+  unidade_negocio: {
+    type: Sequelize.STRING,
+    allowNull: true
+  },
+  data_prevista: {
+    type: Sequelize.DATEONLY,
+    allowNull: true
   }
 }, {
   sequelize,

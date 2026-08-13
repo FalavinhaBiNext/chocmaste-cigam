@@ -9,17 +9,17 @@ export class ProdutosService {
     @inject(BlingHttpClient) private readonly blingHttpClient: BlingHttpClient
   ) {}
 
-  async getById(idProduto: number | string): Promise<ProdutoBlingResponse> {
-    return this.blingHttpClient.get<ProdutoBlingResponse>(`/produtos/${idProduto}`);
+  async getById(idProduto: number | string, tokenId?: string): Promise<ProdutoBlingResponse> {
+    return this.blingHttpClient.get<ProdutoBlingResponse>(`/produtos/${idProduto}`, undefined, tokenId);
   }
 
-  async list(pagina: number = 1, limite: number = 100): Promise<BlingProdutosListResponse> {
+  async list(pagina: number = 1, limite: number = 100, tokenId?: string): Promise<BlingProdutosListResponse> {
     return this.blingHttpClient.get<BlingProdutosListResponse>(
-      `/produtos?pagina=${pagina}&limite=${limite}`
+      `/produtos?pagina=${pagina}&limite=${limite}`, undefined, tokenId
     );
   }
 
-  async listAll(onLog?: (msg: string) => void): Promise<import('../dto').ProdutoBlingDTO[]> {
+  async listAll(onLog?: (msg: string) => void, tokenId?: string): Promise<import('../dto').ProdutoBlingDTO[]> {
     const log = (msg: string) => {
       logger.info(msg);
       if (onLog) onLog(msg);
@@ -29,7 +29,7 @@ export class ProdutosService {
     let pagina = 1;
 
     while (true) {
-      const response = await this.list(pagina, 100);
+      const response = await this.list(pagina, 100, tokenId);
       if (!response.data || response.data.length === 0) {
         break;
       }
@@ -42,19 +42,19 @@ export class ProdutosService {
     return all;
   }
 
-  async listAllWithDetails(onLog?: (msg: string) => void): Promise<any[]> {
+  async listAllWithDetails(onLog?: (msg: string) => void, tokenId?: string): Promise<any[]> {
     const log = (msg: string) => {
       logger.info(msg);
       if (onLog) onLog(msg);
     };
 
-    const basicProducts = await this.listAll(onLog);
+    const basicProducts = await this.listAll(onLog, tokenId);
     const detailedProducts: any[] = [];
 
     for (let i = 0; i < basicProducts.length; i++) {
       const product = basicProducts[i];
       try {
-        const response = await this.getById(product.id);
+        const response = await this.getById(product.id, tokenId);
         detailedProducts.push(response.data);
         log(`[BLING] Produto ${i + 1}/${basicProducts.length}: ${product.nome} (ID: ${product.id})`);
         await new Promise(resolve => setTimeout(resolve, 1000));

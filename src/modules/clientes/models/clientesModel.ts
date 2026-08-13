@@ -16,6 +16,8 @@ export class ClientesModel extends Model {
   public cidade!: string | null;
   public uf!: string | null;
   public cep!: string | null;
+  public ie!: string | null;
+  public tipo!: string | null;
   public active!: boolean;
   public readonly created_at!: Date;
   public readonly updated_at!: Date;
@@ -72,6 +74,14 @@ ClientesModel.init({
   },
   cep: {
     type: Sequelize.STRING(8)
+  },
+  ie: {
+    type: Sequelize.STRING,
+    allowNull: true
+  },
+  tipo: {
+    type: Sequelize.STRING(1),
+    allowNull: true
   },
   active: {
     type: Sequelize.BOOLEAN,

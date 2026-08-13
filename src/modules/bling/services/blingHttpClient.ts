@@ -32,8 +32,14 @@ export class BlingHttpClient {
     });
   }
 
-  private async ensureValidToken(): Promise<string> {
-    const token = await this.blingRepository.findActive();
+  private async ensureValidToken(tokenId?: string): Promise<string> {
+    let token;
+    if (tokenId) {
+      token = await this.blingRepository.findById(tokenId);
+    }
+    if (!token) {
+      token = await this.blingRepository.findActive();
+    }
     if (!token) {
       throw new UnauthorizedIntegrationError(
         'Nenhum token Bling ativo encontrado. Faça a autenticação primeiro.'
@@ -61,20 +67,20 @@ export class BlingHttpClient {
     return token.access_token;
   }
 
-  async get<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
-    return this.request<T>('GET', url, config);
+  async get<T>(url: string, config?: AxiosRequestConfig, tokenId?: string): Promise<T> {
+    return this.request<T>('GET', url, config, undefined, 3, 1000, tokenId);
   }
 
-  async post<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
-    return this.request<T>('POST', url, config, data);
+  async post<T>(url: string, data?: any, config?: AxiosRequestConfig, tokenId?: string): Promise<T> {
+    return this.request<T>('POST', url, config, data, 3, 1000, tokenId);
   }
 
-  async put<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
-    return this.request<T>('PUT', url, config, data);
+  async put<T>(url: string, data?: any, config?: AxiosRequestConfig, tokenId?: string): Promise<T> {
+    return this.request<T>('PUT', url, config, data, 3, 1000, tokenId);
   }
 
-  async patch<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
-    return this.request<T>('PATCH', url, config, data);
+  async patch<T>(url: string, data?: any, config?: AxiosRequestConfig, tokenId?: string): Promise<T> {
+    return this.request<T>('PATCH', url, config, data, 3, 1000, tokenId);
   }
 
   async getPedido(id: number): Promise<BlingPedidoResponse> {
@@ -95,11 +101,12 @@ export class BlingHttpClient {
     config?: AxiosRequestConfig,
     data?: any,
     retries = 3,
-    delayMs = 1000
+    delayMs = 1000,
+    tokenId?: string
   ): Promise<T> {
     let accessToken: string;
     try {
-      accessToken = await this.ensureValidToken();
+      accessToken = await this.ensureValidToken(tokenId);
     } catch (error) {
       // Propaga RefreshTokenExpiredError diretamente
       if (error instanceof RefreshTokenExpiredError) {
@@ -169,7 +176,7 @@ export class BlingHttpClient {
 
         await new Promise((resolve) => setTimeout(resolve, waitTime));
 
-        return this.request<T>(method, url, config, data, retries - 1, delayMs * 2);
+        return this.request<T>(method, url, config, data, retries - 1, delayMs * 2, tokenId);
       }
 
       throw this.mapError(error);

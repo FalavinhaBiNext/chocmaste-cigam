@@ -27,6 +27,8 @@ export class PedidoRepository implements IPedidoRepository {
       valor_frete: data.valor_frete,
       nome_transportadora: data.nome_transportadora,
       codigo_rastreio: data.codigo_rastreio,
+      unidade_negocio: data.unidade_negocio,
+      data_prevista: data.data_prevista,
     });
 
     return PedidoMapper.pedidoToDTO(pedido);

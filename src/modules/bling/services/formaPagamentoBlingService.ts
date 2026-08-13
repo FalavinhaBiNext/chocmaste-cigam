@@ -8,23 +8,23 @@ export class FormaPagamentoBlingService {
     @inject(BlingHttpClient) private readonly blingHttpClient: BlingHttpClient
   ) {}
 
-  async getById(id: string): Promise<BlingFormaPagamentoDTO> {
-    const response = await this.blingHttpClient.get<BlingFormaPagamentoResponse>(`/formas-pagamentos/${id}`);
+  async getById(id: string, tokenId?: string): Promise<BlingFormaPagamentoDTO> {
+    const response = await this.blingHttpClient.get<BlingFormaPagamentoResponse>(`/formas-pagamentos/${id}`, undefined, tokenId);
     return response.data;
   }
 
-  async list(pagina: number = 1, limite: number = 100): Promise<BlingFormasPagamentoListResponse> {
+  async list(pagina: number = 1, limite: number = 100, tokenId?: string): Promise<BlingFormasPagamentoListResponse> {
     return this.blingHttpClient.get<BlingFormasPagamentoListResponse>(
-      `/formas-pagamentos?pagina=${pagina}&limite=${limite}`
+      `/formas-pagamentos?pagina=${pagina}&limite=${limite}`, undefined, tokenId
     );
   }
 
-  async listAll(): Promise<BlingFormaPagamentoDTO[]> {
+  async listAll(tokenId?: string): Promise<BlingFormaPagamentoDTO[]> {
     const all: BlingFormaPagamentoDTO[] = [];
     let pagina = 1;
 
     while (true) {
-      const response = await this.list(pagina, 100);
+      const response = await this.list(pagina, 100, tokenId);
       if (!response.data || response.data.length === 0) {
         break;
       }

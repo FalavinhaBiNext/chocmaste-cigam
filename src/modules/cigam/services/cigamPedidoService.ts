@@ -28,12 +28,12 @@ export class CigamPedidoService {
     return ativo.ambiente;
   }
 
-  async enviarPedido(pedidoBling: any): Promise<string> {
+  async enviarPedido(pedidoBling: any, unidadeNegocio?: string): Promise<string> {
     logger.info(`Iniciando integração do pedido Bling #${pedidoBling.numero} para o CIGAM...`);
 
     // 1. Resolução do Cliente (obter ou criar dinamicamente)
     const idClienteBling = String(pedidoBling.contato.id);
-    const idClienteCigam = (await this.cigamClienteService.obterOuCriarCliente(idClienteBling)).trim();
+    const idClienteCigam = (await this.cigamClienteService.obterOuCriarCliente(idClienteBling, unidadeNegocio)).trim();
 
     // 2. Resolução da Transportadora (obter ou criar dinamicamente)
     let idTransportadoraCigam = '';
@@ -116,7 +116,8 @@ export class CigamPedidoService {
       CopiarObservacoesCliente: true,
       PrazoEntrega: prazo,
       PrazoProgramado: prazo,
-      OrigemPedido: 'Bling Integration'
+      OrigemPedido: 'Bling Integration',
+      UnidadeNegocio: unidadeNegocio || ''
     };
 
     logger.info(`Enviando capa do pedido #${pedidoBling.numero} para o CIGAM...`);
@@ -152,6 +153,32 @@ export class CigamPedidoService {
       );
       await delay(200); // pequeno delay entre itens
     }
+
+    // 8. Verificar existência do pedido e atualizar frete/desconto
+    const urlPedidoCigam = `/hub_pedido/api/pedidos/${codigoPedidoCigam}`;
+
+    logger.info(`Verificando existência do pedido CIGAM #${codigoPedidoCigam}...`);
+    const pedidoCigam = await this.cigamHttpClient.get<any>(
+      baseUrl,
+      ambiente,
+      urlPedidoCigam
+    );
+
+    if (!pedidoCigam) {
+      throw new Error(`Pedido CIGAM #${codigoPedidoCigam} não encontrado após criação.`);
+    }
+
+    logger.success(`Pedido CIGAM #${codigoPedidoCigam} encontrado. Atualizando frete e desconto...`);
+    await this.cigamHttpClient.patch(
+      baseUrl,
+      ambiente,
+      urlPedidoCigam,
+      {
+        valorDesconto: descontoValor,
+        valorFrete: valorFrete,
+      }
+    );
+
     logger.success(`Pedido Bling #${pedidoBling.numero} integrado ao CIGAM com sucesso!`);
     return codigoPedidoCigam;
   }

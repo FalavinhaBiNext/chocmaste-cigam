@@ -22,7 +22,7 @@ export class BlingSyncService {
     @inject(TransportadoraService) private readonly localTransportadoras: TransportadoraService,
   ) {}
 
-  async syncProdutos(onProgress?: (msg: string) => void): Promise<SyncBlingResultDTO> {
+  async syncProdutos(onProgress?: (msg: string) => void, unidadeNegocio?: string, tokenId?: string): Promise<SyncBlingResultDTO> {
     const log = (msg: string, type: 'info' | 'success' | 'error' = 'info') => {
       if (type === 'success') logger.success(msg);
       else if (type === 'error') logger.error(msg);
@@ -33,7 +33,7 @@ export class BlingSyncService {
     const result: SyncBlingResultDTO = { entity: 'produtos', imported: 0, updated: 0, errors: [] };
 
     try {
-      const items = await this.blingProdutos.listAllWithDetails(onProgress);
+      const items = await this.blingProdutos.listAllWithDetails(onProgress, tokenId);
       log(`Encontrados ${items.length} produtos no Bling`);
 
       for (const item of items) {
@@ -61,6 +61,7 @@ export class BlingSyncService {
             temVariacoes: (item.variacoes?.length || 0) > 0,
             quantidade_estoque: item.estoque?.saldoFisico || 0,
             ativo: item.situacao === 'A' || item.situacao === 'Ativo',
+            unidade_negocio: unidadeNegocio,
           };
 
           if (existing) {
@@ -87,7 +88,7 @@ export class BlingSyncService {
     return result;
   }
 
-  async syncClientes(onProgress?: (msg: string) => void): Promise<SyncBlingResultDTO> {
+  async syncClientes(onProgress?: (msg: string) => void, tokenId?: string): Promise<SyncBlingResultDTO> {
     const log = (msg: string, type: 'info' | 'success' | 'error' = 'info') => {
       if (type === 'success') logger.success(msg);
       else if (type === 'error') logger.error(msg);
@@ -98,13 +99,13 @@ export class BlingSyncService {
     const result: SyncBlingResultDTO = { entity: 'clientes', imported: 0, updated: 0, errors: [] };
 
     try {
-      const items = await this.blingContatos.listAll(2); // 2 = Cliente
+      const items = await this.blingContatos.listAll(2, tokenId); // 2 = Cliente
       log(`Encontrados ${items.length} clientes no Bling`);
 
       for (const listItem of items) {
         try {
           await delay(350); // Small delay to avoid API rate limits
-          const item = await this.blingContatos.getById(String(listItem.id));
+          const item = await this.blingContatos.getById(String(listItem.id), tokenId);
 
           const existing = await this.tryFindCliente(String(item.id));
           const endereco = item.endereco?.geral;
@@ -122,6 +123,8 @@ export class BlingSyncService {
             cidade: endereco?.municipio,
             uf: endereco?.uf,
             cep: endereco?.cep,
+            ie: item.ie || undefined,
+            tipo: item.tipo || undefined,
             active: item.situacao === 'A' || item.situacao === 'Ativo',
           };
 
@@ -149,7 +152,7 @@ export class BlingSyncService {
     return result;
   }
 
-  async syncFormasPagamento(onProgress?: (msg: string) => void): Promise<SyncBlingResultDTO> {
+  async syncFormasPagamento(onProgress?: (msg: string) => void, tokenId?: string): Promise<SyncBlingResultDTO> {
     const log = (msg: string, type: 'info' | 'success' | 'error' = 'info') => {
       if (type === 'success') logger.success(msg);
       else if (type === 'error') logger.error(msg);
@@ -160,7 +163,7 @@ export class BlingSyncService {
     const result: SyncBlingResultDTO = { entity: 'formas_pagamento', imported: 0, updated: 0, errors: [] };
 
     try {
-      const items = await this.blingFormasPagamento.listAll();
+      const items = await this.blingFormasPagamento.listAll(tokenId);
       log(`Encontradas ${items.length} formas de pagamento no Bling`);
 
       for (const item of items) {
@@ -196,7 +199,7 @@ export class BlingSyncService {
     return result;
   }
 
-  async syncTransportadoras(onProgress?: (msg: string) => void): Promise<SyncBlingResultDTO> {
+  async syncTransportadoras(onProgress?: (msg: string) => void, tokenId?: string): Promise<SyncBlingResultDTO> {
     const log = (msg: string, type: 'info' | 'success' | 'error' = 'info') => {
       if (type === 'success') logger.success(msg);
       else if (type === 'error') logger.error(msg);
@@ -207,7 +210,7 @@ export class BlingSyncService {
     const result: SyncBlingResultDTO = { entity: 'transportadoras', imported: 0, updated: 0, errors: [] };
 
     try {
-      const items = await this.blingContatos.listAll();
+      const items = await this.blingContatos.listAll(undefined, tokenId);
       const transportadoras = items.filter(c => c.tipo === 'Transportador');
       log(`Encontradas ${transportadoras.length} transportadoras no Bling`);
 
@@ -246,7 +249,7 @@ export class BlingSyncService {
     return result;
   }
 
-  async syncAll(onProgress?: (msg: string) => void): Promise<SyncBlingResultDTO[]> {
+  async syncAll(onProgress?: (msg: string) => void, unidadeNegocio?: string, tokenId?: string): Promise<SyncBlingResultDTO[]> {
     const log = (msg: string, type: 'info' | 'success' | 'error' = 'info') => {
       if (type === 'success') logger.success(msg);
       else if (type === 'error') logger.error(msg);
@@ -256,9 +259,9 @@ export class BlingSyncService {
     log('Iniciando importação completa do Bling...');
 
     const results = [
-      await this.syncProdutos(onProgress),
-      await this.syncFormasPagamento(onProgress),
-      await this.syncTransportadoras(onProgress),
+      await this.syncProdutos(onProgress, unidadeNegocio, tokenId),
+      await this.syncFormasPagamento(onProgress, tokenId),
+      await this.syncTransportadoras(onProgress, tokenId),
     ];
 
     const totalImported = results.reduce((acc, r) => acc + r.imported, 0);

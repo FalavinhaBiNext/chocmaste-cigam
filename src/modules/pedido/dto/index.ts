@@ -17,6 +17,8 @@ export interface CreatePedidoDTO {
   valor_frete: number;
   nome_transportadora: string;
   codigo_rastreio: string;
+  unidade_negocio?: string;
+  data_prevista?: string;
 }
 
 export interface ResponsePedidoDTO {
@@ -39,6 +41,8 @@ export interface ResponsePedidoDTO {
   valor_frete: number;
   nome_transportadora: string;
   codigo_rastreio: string;
+  unidade_negocio: string | null;
+  data_prevista: string | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -62,4 +66,6 @@ export interface UpdatePedidoDTO {
   valor_frete?: number;
   nome_transportadora?: string;
   codigo_rastreio?: string;
+  unidade_negocio?: string;
+  data_prevista?: string;
 }

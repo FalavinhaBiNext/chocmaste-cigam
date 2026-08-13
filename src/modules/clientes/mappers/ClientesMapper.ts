@@ -18,6 +18,8 @@ export class ClientesMapper {
       cidade: data.cidade,
       uf: data.uf,
       cep: data.cep,
+      ie: data.ie,
+      tipo: data.tipo,
       active: data.active,
       created_at: data.created_at,
       updated_at: data.updated_at

@@ -28,7 +28,7 @@ export class CigamClienteService {
     return ativo.ambiente;
   }
 
-  async obterOuCriarCliente(idClienteBling: string): Promise<string> {
+  async obterOuCriarCliente(idClienteBling: string, unidadeNegocio?: string): Promise<string> {
     logger.info(`Iniciando resolução de cliente Bling ID: ${idClienteBling}`);
 
     // 1. Verificar se já existe o De-Para local
@@ -89,7 +89,7 @@ export class CigamClienteService {
       const payload = {
         NomeCompleto: (clienteBling.nome || '').toUpperCase(),
         CnpjCpf: docClean,
-        PessoaFisica: docClean.length === 11,
+        PessoaFisica: clienteBling.tipo ? clienteBling.tipo === 'F' : docClean.length === 11,
         Divisao: '10', // Código padrão CIGAM para Clientes
         Endereco: (clienteBling.endereco || '').toUpperCase(),
         Numero: (clienteBling.numero || '').toUpperCase(),
@@ -99,6 +99,9 @@ export class CigamClienteService {
         Telefone: clienteBling.telefone || clienteBling.celular || '',
         Email: (clienteBling.email || '').toUpperCase(),
         Cep: clienteBling.cep ? clienteBling.cep.replace(/\D/g, '') : '',
+        Inscricao: clienteBling.ie || '',
+        Inscrito: !!clienteBling.ie,
+        UnidadeNegocio: unidadeNegocio || '',
         Ativo: true,
         CodigoPais: '031'
       };

@@ -14,6 +14,8 @@ import { IntegrationError } from '@/shared/errors/AppError';
 import { ContatosService } from './contatosService';
 import { FormaPagamentoBlingService } from './formaPagamentoBlingService';
 import { CigamPedidoService } from '@/modules/cigam/services/cigamPedidoService';
+import { BlingRepository } from '../repositories/blingRepository';
+import { DeParaUnidadesNegocioRepository } from '@/modules/depara/repositories/deparaUnidadesNegocioRepository';
 
 @injectable()
 export class WebhookService {
@@ -29,12 +31,26 @@ export class WebhookService {
     @inject(ContatosService) private readonly contatosService: ContatosService,
     @inject(FormaPagamentoBlingService) private readonly formaPagamentoBlingService: FormaPagamentoBlingService,
     @inject(CigamPedidoService) private readonly cigamPedidoService: CigamPedidoService,
+    @inject(BlingRepository) private readonly blingRepository: BlingRepository,
+    @inject(DeParaUnidadesNegocioRepository) private readonly deParaUnidadesNegocioRepo: DeParaUnidadesNegocioRepository,
   ) {}
 
   async processarPedidoCriado(payload: PedidoWebhookInput): Promise<string | null> {
     logger.webhook('Recebendo webhook de pedido criado', { eventId: payload.eventId });
 
     const pedidoBlingId = payload.data.id;
+
+    const existingEvent = await this.eventService.findByPedido(pedidoBlingId);
+    if (existingEvent) {
+      logger.webhook(`Pedido Bling #${pedidoBlingId} já foi processado anteriormente.`, { eventId: payload.eventId });
+
+      if (existingEvent.cigam_sincronizado && existingEvent.cigam_pedido_id) {
+        logger.webhook(`Pedido já integrado ao CIGAM com código: ${existingEvent.cigam_pedido_id}`);
+        return existingEvent.cigam_pedido_id;
+      }
+
+      logger.webhook('Pedido já existe mas não foi integrado ao CIGAM. Reintegrando...');
+    }
 
     const pedidoCompleto = await this.blingHttpClient.getPedido(pedidoBlingId);
     const data: any = pedidoCompleto.data;
@@ -80,26 +96,71 @@ export class WebhookService {
     const descontoValor = typeof data.desconto === 'object' && data.desconto !== null ? (data.desconto.valor ?? 0) : (Number(data.desconto) || 0);
     const documentoCliente = data.contato.numeroDocumento || data.contato.cpfCnpj || '';
 
-    const pedido = await this.pedidoService.create({
-      id_bling: String(data.id),
-      codigo_curto: String(data.numero),
-      numero_loja: data.numeroLoja,
-      data_pedido: data.data,
-      total_produtos: data.totalProdutos,
-      total_venda: data.total,
-      id_cliente_bling: String(data.contato.id),
-      nome_cliente: data.contato.nome || '',
-      documento_cliente: documentoCliente,
-      tipo_pessoa: data.contato.tipoPessoa || '',
-      id_loja: String(data.loja.id),
-      desconto: descontoValor,
-      quantidade_itens: data.itens.reduce((acc: number, item: any) => acc + item.quantidade, 0),
-      status_venda: String(data.situacao.id),
-      codigo_transportadora: transportadoraId,
-      valor_frete: valorFrete,
-      nome_transportadora: transportadoraNome,
-      codigo_rastreio: codigoRastreio,
-    });
+    let unidadeNegocio: string | undefined;
+    const companyId = payload.companyId;
+    if (companyId) {
+      const mapping = await this.deParaUnidadesNegocioRepo.findByCompanyIdBling(companyId);
+      if (mapping) {
+        unidadeNegocio = mapping.unidade_negocio;
+        logger.webhook(`Unidade de negócio mapeada: companyId ${companyId} -> ${unidadeNegocio}`);
+      } else {
+        logger.webhook(`Nenhum mapeamento de unidade encontrado para companyId: ${companyId}`);
+      }
+    }
+
+    let pedido;
+    try {
+      pedido = await this.pedidoService.findByIdBling(String(data.id));
+      logger.webhook(`Pedido Bling #${data.id} já existe localmente. Atualizando...`);
+
+      await this.pedidoService.update(pedido.id, {
+        codigo_curto: String(data.numero),
+        numero_loja: data.numeroLoja,
+        data_pedido: data.data,
+        total_produtos: data.totalProdutos,
+        total_venda: data.total,
+        id_cliente_bling: String(data.contato.id),
+        nome_cliente: data.contato.nome || '',
+        documento_cliente: documentoCliente,
+        tipo_pessoa: data.contato.tipoPessoa || '',
+        id_loja: String(data.loja.id),
+        desconto: descontoValor,
+        quantidade_itens: data.itens.reduce((acc: number, item: any) => acc + item.quantidade, 0),
+        status_venda: String(data.situacao.id),
+        codigo_transportadora: transportadoraId,
+        valor_frete: valorFrete,
+        nome_transportadora: transportadoraNome,
+        codigo_rastreio: codigoRastreio,
+        unidade_negocio: unidadeNegocio,
+        data_prevista: data.dataPrevisao || undefined,
+      });
+    } catch {
+      pedido = await this.pedidoService.create({
+        id_bling: String(data.id),
+        codigo_curto: String(data.numero),
+        numero_loja: data.numeroLoja,
+        data_pedido: data.data,
+        total_produtos: data.totalProdutos,
+        total_venda: data.total,
+        id_cliente_bling: String(data.contato.id),
+        nome_cliente: data.contato.nome || '',
+        documento_cliente: documentoCliente,
+        tipo_pessoa: data.contato.tipoPessoa || '',
+        id_loja: String(data.loja.id),
+        desconto: descontoValor,
+        quantidade_itens: data.itens.reduce((acc: number, item: any) => acc + item.quantidade, 0),
+        status_venda: String(data.situacao.id),
+        codigo_transportadora: transportadoraId,
+        valor_frete: valorFrete,
+        nome_transportadora: transportadoraNome,
+        codigo_rastreio: codigoRastreio,
+        unidade_negocio: unidadeNegocio,
+        data_prevista: data.dataPrevisao || undefined,
+      });
+    }
+
+    await this.pedidoProdutoService.deleteByIdPedido(pedido.id);
+    await delay();
 
     for (const item of data.itens) {
       const produtoBlingId = item.produto?.id ? String(item.produto.id) : String(item.id);
@@ -120,7 +181,7 @@ export class WebhookService {
     let cigamPedidoId: string | null = null;
     let cigamSincronizado = false;
     try {
-      cigamPedidoId = await this.cigamPedidoService.enviarPedido(data);
+      cigamPedidoId = await this.cigamPedidoService.enviarPedido(data, unidadeNegocio);
       cigamSincronizado = true;
       logger.webhook('Pedido enviado e integrado com sucesso no CIGAM', { eventId: payload.eventId });
     } catch (cigamError: any) {

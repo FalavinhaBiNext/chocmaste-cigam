@@ -27,6 +27,7 @@ export class ProdutoMapper {
       temVariacoes: data.temVariacoes,
       quantidade_estoque: data.quantidade_estoque,
       ativo: data.ativo,
+      unidade_negocio: data.unidade_negocio,
       created_at: data.created_at,
       updated_at: data.updated_at
     }

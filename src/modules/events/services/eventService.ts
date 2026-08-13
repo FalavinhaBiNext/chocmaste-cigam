@@ -13,6 +13,12 @@ export class EventService {
     ) {}
 
     async create(data: any): Promise<ResponseEventDTO>{
+        const existingEvent = await this.eventRepository.findByPedido(data.data.id);
+        if (existingEvent) {
+            logger.info(`Evento já existe para o pedido ${data.data.id}. Retornando existente.`);
+            return existingEvent;
+        }
+
         const id = randomUUID()
         logger.info('Starting event creation')
         logger.event('Performing data processing')

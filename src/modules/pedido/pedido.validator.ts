@@ -20,6 +20,8 @@ export const createPedidoSchema = z.object({
   valor_frete: z.number({ message: 'valor_frete deve ser um número.' }),
   nome_transportadora: z.string().min(1, 'nome_transportadora é obrigatório.'),
   codigo_rastreio: z.string().min(1, 'codigo_rastreio é obrigatório.'),
+  unidade_negocio: z.string().optional(),
+  data_prevista: z.string().optional(),
 });
 
 export type CreatePedidoInput = z.infer<typeof createPedidoSchema>;

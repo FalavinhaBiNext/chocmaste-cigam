@@ -25,6 +25,7 @@ export class ProdutoModel extends Model {
   public temVariacoes!: boolean;
   public quantidade_estoque!: number;
   public ativo!: boolean;
+  public unidade_negocio!: string | null;
   public readonly created_at!: Date;
   public readonly updated_at!: Date;
 }
@@ -126,6 +127,10 @@ ProdutoModel.init({
     type: Sequelize.BOOLEAN,
     allowNull: false,
     defaultValue: true
+  },
+  unidade_negocio: {
+    type: Sequelize.STRING,
+    allowNull: true
   }
 }, {
   sequelize,

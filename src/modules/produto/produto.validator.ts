@@ -24,6 +24,7 @@ export const createProdutoSchema = z.object({
   temVariacoes: z.boolean().optional().default(false),
   quantidade_estoque: z.number({ message: 'quantidade_estoque deve ser um número.' }).optional().default(0),
   ativo: z.boolean().optional().default(true),
+  unidade_negocio: z.string().optional(),
 });
 
 export type CreateProdutoInput = z.infer<typeof createProdutoSchema>;

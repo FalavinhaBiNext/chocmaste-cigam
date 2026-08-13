@@ -23,6 +23,8 @@ export class PedidoMapper {
       valor_frete: Number(data.valor_frete),
       nome_transportadora: data.nome_transportadora,
       codigo_rastreio: data.codigo_rastreio,
+      unidade_negocio: data.unidade_negocio,
+      data_prevista: data.data_prevista,
       created_at: data.created_at,
       updated_at: data.updated_at
     }

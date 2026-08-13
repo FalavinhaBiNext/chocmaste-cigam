@@ -21,6 +21,7 @@ export interface CreateProdutoDTO {
   temVariacoes?: boolean;
   quantidade_estoque?: number;
   ativo?: boolean;
+  unidade_negocio?: string;
 }
 
 export interface ResponseProdutoDTO {
@@ -47,6 +48,7 @@ export interface ResponseProdutoDTO {
   temVariacoes: boolean;
   quantidade_estoque: number;
   ativo: boolean;
+  unidade_negocio: string | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -74,4 +76,5 @@ export interface UpdateProdutoDTO {
   temVariacoes?: boolean;
   quantidade_estoque?: number;
   ativo?: boolean;
+  unidade_negocio?: string;
 }

@@ -126,6 +126,7 @@ import { DeParaProdutosRepository } from '@/modules/depara/repositories/deparaPr
 import { DeParaClientesRepository } from '@/modules/depara/repositories/deparaClientesRepository';
 import { DeParaFormasPagamentoRepository } from '@/modules/depara/repositories/deparaFormasPagamentoRepository';
 import { DeParaTransportadorasRepository } from '@/modules/depara/repositories/deparaTransportadorasRepository';
+import { DeParaUnidadesNegocioRepository } from '@/modules/depara/repositories/deparaUnidadesNegocioRepository';
 import { DeParaService } from '@/modules/depara/services/deparaService';
 import { DeParaController } from '@/modules/depara/controllers/deparaController';
 
@@ -146,6 +147,7 @@ container.registerSingleton(DeParaProdutosRepository);
 container.registerSingleton(DeParaClientesRepository);
 container.registerSingleton(DeParaFormasPagamentoRepository);
 container.registerSingleton(DeParaTransportadorasRepository);
+container.registerSingleton(DeParaUnidadesNegocioRepository);
 container.registerSingleton(DeParaService);
 container.registerSingleton(DeParaController);
 

@@ -13,6 +13,8 @@ export interface CreateClientesDTO {
   cidade?: string;
   uf?: string;
   cep?: string;
+  ie?: string;
+  tipo?: string;
   active?: boolean;
 }
 
@@ -31,6 +33,8 @@ export interface ResponseClientesDTO {
   cidade: string | null;
   uf: string | null;
   cep: string | null;
+  ie: string | null;
+  tipo: string | null;
   active: boolean;
   created_at: Date;
   updated_at: Date;
@@ -51,5 +55,7 @@ export interface UpdateClientesDTO {
   cidade?: string;
   uf?: string;
   cep?: string;
+  ie?: string;
+  tipo?: string;
   active?: boolean;
 }

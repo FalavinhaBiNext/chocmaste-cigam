@@ -31,6 +31,7 @@ export class ProdutoRepository implements IProdutoRepository {
       temVariacoes: data.temVariacoes ?? false,
       quantidade_estoque: data.quantidade_estoque ?? 0,
       ativo: data.ativo ?? true,
+      unidade_negocio: data.unidade_negocio,
     });
 
     return ProdutoMapper.produtoToDTO(produto);

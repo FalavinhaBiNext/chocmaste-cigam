@@ -16,6 +16,8 @@ export const createClientesSchema = z.object({
   cidade: z.string().optional(),
   uf: z.string().optional(),
   cep: z.string().optional(),
+  ie: z.string().optional(),
+  tipo: z.string().optional(),
   active: z.boolean().optional().default(true),
 });
 

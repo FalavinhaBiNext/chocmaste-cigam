@@ -20,10 +20,11 @@ export class BlingSyncController {
     };
   }
 
-  syncProdutos = async (_req: Request, res: Response) => {
+  syncProdutos = async (req: Request, res: Response) => {
     const sendProgress = this.setupSSE(res);
+    const { unidade_negocio, token_id } = req.body || {};
     try {
-      const result = await this.blingSyncService.syncProdutos(sendProgress);
+      const result = await this.blingSyncService.syncProdutos(sendProgress, unidade_negocio, token_id);
       res.write(`data: ${JSON.stringify({ type: 'done', result })}\n\n`);
     } catch (err: any) {
       if (err instanceof RefreshTokenExpiredError) {
@@ -40,10 +41,11 @@ export class BlingSyncController {
     }
   };
 
-  syncClientes = async (_req: Request, res: Response) => {
+  syncClientes = async (req: Request, res: Response) => {
     const sendProgress = this.setupSSE(res);
+    const { token_id } = req.body || {};
     try {
-      const result = await this.blingSyncService.syncClientes(sendProgress);
+      const result = await this.blingSyncService.syncClientes(sendProgress, token_id);
       res.write(`data: ${JSON.stringify({ type: 'done', result })}\n\n`);
     } catch (err: any) {
       if (err instanceof RefreshTokenExpiredError) {
@@ -60,10 +62,11 @@ export class BlingSyncController {
     }
   };
 
-  syncFormasPagamento = async (_req: Request, res: Response) => {
+  syncFormasPagamento = async (req: Request, res: Response) => {
     const sendProgress = this.setupSSE(res);
+    const { token_id } = req.body || {};
     try {
-      const result = await this.blingSyncService.syncFormasPagamento(sendProgress);
+      const result = await this.blingSyncService.syncFormasPagamento(sendProgress, token_id);
       res.write(`data: ${JSON.stringify({ type: 'done', result })}\n\n`);
     } catch (err: any) {
       if (err instanceof RefreshTokenExpiredError) {
@@ -80,10 +83,11 @@ export class BlingSyncController {
     }
   };
 
-  syncTransportadoras = async (_req: Request, res: Response) => {
+  syncTransportadoras = async (req: Request, res: Response) => {
     const sendProgress = this.setupSSE(res);
+    const { token_id } = req.body || {};
     try {
-      const result = await this.blingSyncService.syncTransportadoras(sendProgress);
+      const result = await this.blingSyncService.syncTransportadoras(sendProgress, token_id);
       res.write(`data: ${JSON.stringify({ type: 'done', result })}\n\n`);
     } catch (err: any) {
       if (err instanceof RefreshTokenExpiredError) {
@@ -100,10 +104,11 @@ export class BlingSyncController {
     }
   };
 
-  syncAll = async (_req: Request, res: Response) => {
+  syncAll = async (req: Request, res: Response) => {
     const sendProgress = this.setupSSE(res);
+    const { unidade_negocio, token_id } = req.body || {};
     try {
-      const results = await this.blingSyncService.syncAll(sendProgress);
+      const results = await this.blingSyncService.syncAll(sendProgress, unidade_negocio, token_id);
       res.write(`data: ${JSON.stringify({ type: 'done', result: results })}\n\n`);
     } catch (err: any) {
       if (err instanceof RefreshTokenExpiredError) {
