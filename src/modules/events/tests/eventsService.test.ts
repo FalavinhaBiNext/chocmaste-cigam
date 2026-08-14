@@ -39,9 +39,9 @@ describe('EventService', () => {
     expect((await svc.findByPedido(123))!.pedido_id).toBe(123);
   });
 
-  it('findByPedido throws', async () => {
+  it('findByPedido returns null when not found', async () => {
     repo.findByPedido.mockResolvedValue(null);
-    await expect(svc.findByPedido(999)).rejects.toThrow(NotFoundError);
+    expect(await svc.findByPedido(999)).toBeNull();
   });
 
   it('findByNumeroPedido', async () => {

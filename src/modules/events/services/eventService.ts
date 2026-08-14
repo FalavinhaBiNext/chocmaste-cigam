@@ -59,8 +59,8 @@ export class EventService {
         logger.info(`Searching Event with PEDIDO ID: ${pedido}`)
         const event = await this.eventRepository.findByPedido(pedido)
         if(!event){
-            logger.error(`Event with PEDIDO ID: ${pedido} not found`)
-            throw new NotFoundError(`Event with PEDIDO ID: ${pedido} not found`)
+            logger.info(`Event with PEDIDO ID: ${pedido} not found`)
+            return null
         }
         logger.finish('Event found...')
         return event
