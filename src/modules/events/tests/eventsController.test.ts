@@ -21,7 +21,8 @@ describe('EventController', () => {
     const webhookSvc = {} as any;
     const blingHttpClient = {} as any;
     const cigamPedidoService = {} as any;
-    ctrl = new EventController(svc as any, webhookSvc, blingHttpClient, cigamPedidoService);
+    const deParaUnidadesNegocioRepo = {} as any;
+    ctrl = new EventController(svc as any, webhookSvc, blingHttpClient, cigamPedidoService, deParaUnidadesNegocioRepo);
   });
 
   it('health', () => {

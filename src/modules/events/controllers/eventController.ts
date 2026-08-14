@@ -5,6 +5,7 @@ import { EventService } from "../services/eventService";
 import { WebhookService } from "../../bling/services/webhookService";
 import { BlingHttpClient } from "../../bling/services/blingHttpClient";
 import { CigamPedidoService } from "../../cigam/services/cigamPedidoService";
+import { DeParaUnidadesNegocioRepository } from "../../depara/repositories/deparaUnidadesNegocioRepository";
 import { logger } from "@/shared/utils/logger";
 
 @injectable()
@@ -14,6 +15,7 @@ export class EventController {
         private readonly webhookService: WebhookService,
         @inject(BlingHttpClient) private readonly blingHttpClient: BlingHttpClient,
         @inject(CigamPedidoService) private readonly cigamPedidoService: CigamPedidoService,
+        @inject(DeParaUnidadesNegocioRepository) private readonly deParaUnidadesNegocioRepo: DeParaUnidadesNegocioRepository,
     ) {}
 
     health = (_req: Request, res: Response) => {
@@ -106,10 +108,20 @@ export class EventController {
 
         logger.info(`Iniciando retry CIGAM para evento ${id}, pedido Bling #${event.pedido_id}`)
 
+        // Buscar unidade de negócio a partir do company_id armazenado no evento
+        let unidadeNegocio: string | undefined;
+        if (event.company_id) {
+            const mapping = await this.deParaUnidadesNegocioRepo.findByCompanyIdBling(event.company_id);
+            if (mapping) {
+                unidadeNegocio = mapping.unidade_negocio;
+                logger.info(`Unidade de negócio mapeada no retry: ${event.company_id} -> ${unidadeNegocio}`);
+            }
+        }
+
         const pedidoCompleto = await this.blingHttpClient.getPedido(event.pedido_id)
         const data: any = pedidoCompleto.data
 
-        const cigamPedidoId = await this.cigamPedidoService.enviarPedido(data)
+        const cigamPedidoId = await this.cigamPedidoService.enviarPedido(data, unidadeNegocio)
 
         await this.eventService.updateCigamStatus(event.id, true, cigamPedidoId)
 

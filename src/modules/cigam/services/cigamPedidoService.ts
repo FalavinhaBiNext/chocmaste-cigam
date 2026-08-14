@@ -1,4 +1,6 @@
 import { inject, injectable } from 'tsyringe';
+import axios from 'axios';
+import https from 'https';
 import { CigamHttpClient } from './cigamHttpClient';
 import { CigamClienteService } from './cigamClienteService';
 import { CigamTransportadoraService } from './cigamTransportadoraService';
@@ -156,30 +158,26 @@ export class CigamPedidoService {
       await delay(200); // pequeno delay entre itens
     }
 
-    // 8. Verificar existência do pedido e atualizar frete/desconto
-    const urlPedidoCigam = `/hub_pedido/api/pedidos/${codigoPedidoCigam}`;
+    // 8. Verificar existência do pedido e atualizar frete/desconto (sem autenticação)
+    const urlPedidoCigam = `${baseUrl}/hub_pedido/api/pedidos/${codigoPedidoCigam}`;
+
+    const httpsAgent =
+      process.env.NODE_ENV !== "production"
+        ? new https.Agent({ rejectUnauthorized: false })
+        : undefined;
 
     logger.info(`Verificando existência do pedido CIGAM #${codigoPedidoCigam}...`);
-    const pedidoCigam = await this.cigamHttpClient.get<any>(
-      baseUrl,
-      ambiente,
-      urlPedidoCigam
-    );
+    const pedidoCigam = await axios.get(urlPedidoCigam, { httpsAgent }).then(r => r.data).catch(() => null);
 
     if (!pedidoCigam) {
       throw new Error(`Pedido CIGAM #${codigoPedidoCigam} não encontrado após criação.`);
     }
 
     logger.success(`Pedido CIGAM #${codigoPedidoCigam} encontrado. Atualizando frete e desconto...`);
-    await this.cigamHttpClient.patch(
-      baseUrl,
-      ambiente,
-      urlPedidoCigam,
-      {
-        valorDesconto: descontoValor,
-        valorFrete: valorFrete,
-      }
-    );
+    await axios.patch(urlPedidoCigam, {
+      valorDesconto: descontoValor,
+      valorFrete: valorFrete,
+    }, { httpsAgent });
 
     logger.success(`Pedido Bling #${pedidoBling.numero} integrado ao CIGAM com sucesso!`);
     return codigoPedidoCigam;
