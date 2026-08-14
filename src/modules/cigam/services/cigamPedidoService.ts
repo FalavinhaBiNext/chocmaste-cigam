@@ -37,9 +37,11 @@ export class CigamPedidoService {
 
     // 2. Resolução da Transportadora (obter ou criar dinamicamente)
     let idTransportadoraCigam = '';
-    if (pedidoBling.transporte?.contato?.id || pedidoBling.transportador?.id) {
-      const idTranspBling = String(pedidoBling.transporte?.contato?.id || pedidoBling.transportador?.id);
-      idTransportadoraCigam = (await this.cigamTransportadoraService.obterOuCriarTransportadora(idTranspBling)).trim();
+    const idTranspBling = pedidoBling.transporte?.contato?.id || pedidoBling.transportador?.id;
+    if (idTranspBling && idTranspBling !== 0) {
+      idTransportadoraCigam = (await this.cigamTransportadoraService.obterOuCriarTransportadora(String(idTranspBling))).trim();
+    } else {
+      logger.info('Pedido sem transportadora válida (ID 0 ou ausente). Enviando ao CIGAM sem transportadora.');
     }
 
     // 3. Resolução da Forma de Pagamento

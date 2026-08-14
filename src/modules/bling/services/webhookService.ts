@@ -74,10 +74,12 @@ export class WebhookService {
     await this.processarCliente(data.contato);
     await delay();
 
-    if (data.transporte && data.transporte.contato) {
+    if (data.transporte && data.transporte.contato && data.transporte.contato.id !== 0) {
       logger.info('Processando transportadora', data.transporte.contato);
       await this.processarTransportadora(data.transporte.contato);
       await delay();
+    } else if (data.transporte?.contato?.id === 0) {
+      logger.webhook('Transportadora com ID 0 (ex: Mercado Livre/Shopee). Pulando processamento.');
     }
 
     if (data.parcelas && data.parcelas.length > 0) {
