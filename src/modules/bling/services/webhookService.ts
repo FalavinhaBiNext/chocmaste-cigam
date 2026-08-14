@@ -37,6 +37,28 @@ export class WebhookService {
     @inject(ConfiguracoesService) private readonly configuracoesService: ConfiguracoesService,
   ) {}
 
+  private async resolveTokenId(companyId: string): Promise<string | undefined> {
+    // 1. Buscar token diretamente por companyId
+    const tokenByCompany = await this.blingRepository.findByCompanyIdBling(companyId);
+    if (tokenByCompany) {
+      logger.webhook(`Token encontrado via companyId: ${companyId} → token ${tokenByCompany.id}`);
+      return tokenByCompany.id;
+    }
+
+    // 2. Fallback: companyId → unidade_negocio → token
+    const mapping = await this.deParaUnidadesNegocioRepo.findByCompanyIdBling(companyId);
+    if (mapping) {
+      const tokenByUnidade = await this.blingRepository.findByNomeUnidade(mapping.unidade_negocio);
+      if (tokenByUnidade) {
+        logger.webhook(`Token encontrado via unidade de negócio: ${companyId} → ${mapping.unidade_negocio} → token ${tokenByUnidade.id}`);
+        return tokenByUnidade.id;
+      }
+    }
+
+    logger.webhook(`Nenhum token encontrado para companyId: ${companyId}. Usando token ativo padrão.`);
+    return undefined;
+  }
+
   async processarPedidoCriado(payload: PedidoWebhookInput): Promise<string | null> {
     logger.webhook('Recebendo webhook de pedido criado', { eventId: payload.eventId });
 
@@ -54,7 +76,9 @@ export class WebhookService {
       logger.webhook('Pedido já existe mas não foi integrado ao CIGAM. Reintegrando...');
     }
 
-    const pedidoCompleto = await this.blingHttpClient.getPedido(pedidoBlingId);
+    // Resolver token correto para o companyId
+    const tokenId = await this.resolveTokenId(payload.companyId);
+    const pedidoCompleto = await this.blingHttpClient.getPedido(pedidoBlingId, tokenId);
     const data: any = pedidoCompleto.data;
 
     logger.webhook('Dados completos do pedido obtidos da API Bling', { id: data.id });

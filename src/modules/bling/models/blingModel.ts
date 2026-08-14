@@ -13,6 +13,7 @@ export class BlingModel extends Model {
   public client_secret!: string;
   public active!: boolean;
   public nome_unidade!: string | null;
+  public company_id_bling!: string | null;
   public readonly created_at!: Date;
   public readonly updated_at!: Date;
 }
@@ -62,6 +63,10 @@ BlingModel.init({
     defaultValue: true
   },
   nome_unidade: {
+    type: Sequelize.STRING,
+    allowNull: true
+  },
+  company_id_bling: {
     type: Sequelize.STRING,
     allowNull: true
   }

@@ -14,6 +14,20 @@ export interface TokenStatusResponse {
   authUrl: string | null;
 }
 
+export interface TokenStatusMultiAccountResponse {
+  tokens: Array<{
+    id: string;
+    active: boolean;
+    nome_unidade: string | null;
+    company_id_bling: string | null;
+    expiresAt: Date | null;
+    hoursUntilExpiry: number | null;
+    needsRefresh: boolean;
+    warning: string | null;
+  }>;
+  authUrl: string | null;
+}
+
 @injectable()
 export class BlingService {
   constructor(
@@ -21,12 +35,12 @@ export class BlingService {
     @inject(BlingRepository) private readonly blingRepository: BlingRepository
   ) {}
 
-  generateAuthURL(state?: string): BlingAuthUrlDTO {
-    return this.blingOAuthService.generateAuthURL(state);
+  generateAuthURL(state?: string, clientId?: string, clientSecret?: string): BlingAuthUrlDTO {
+    return this.blingOAuthService.generateAuthURL(state, clientId, clientSecret);
   }
 
-  async handleCallback(code: string): Promise<void> {
-    await this.blingOAuthService.exchangeCode(code);
+  async handleCallback(code: string, clientId?: string, clientSecret?: string): Promise<void> {
+    await this.blingOAuthService.exchangeCode(code, clientId, clientSecret);
   }
 
   async refreshToken(): Promise<void> {
@@ -109,6 +123,50 @@ export class BlingService {
       needsRefresh,
       warning,
       authUrl: null,
+    };
+  }
+
+  async getTokenStatusMultiAccount(): Promise<TokenStatusMultiAccountResponse> {
+    const allTokens = await this.blingRepository.findAll();
+    const now = new Date();
+
+    const tokens = allTokens.map(token => {
+      const expiresAt = token.expires_at ? new Date(token.expires_at) : null;
+      const hoursUntilExpiry = expiresAt
+        ? Math.round((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60))
+        : null;
+
+      let warning: string | null = null;
+      let needsRefresh = false;
+
+      if (token.active) {
+        if (expiresAt && expiresAt <= now) {
+          warning = 'Token expirado.';
+          needsRefresh = true;
+        } else if (hoursUntilExpiry !== null && hoursUntilExpiry < 24) {
+          warning = `Expira em ${hoursUntilExpiry}h.`;
+          needsRefresh = true;
+        }
+      }
+
+      return {
+        id: token.id,
+        active: token.active,
+        nome_unidade: token.nome_unidade,
+        company_id_bling: token.company_id_bling,
+        expiresAt: token.expires_at,
+        hoursUntilExpiry,
+        needsRefresh,
+        warning,
+      };
+    });
+
+    const hasActiveTokens = tokens.some(t => t.active);
+    const { url: authUrl } = this.blingOAuthService.generateAuthURL();
+
+    return {
+      tokens,
+      authUrl: hasActiveTokens ? null : authUrl,
     };
   }
 

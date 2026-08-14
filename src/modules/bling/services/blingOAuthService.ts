@@ -15,33 +15,41 @@ export class BlingOAuthService {
     @inject(BlingRepository) private readonly blingRepository: BlingRepository
   ) { }
 
-  generateAuthURL(state?: string): BlingAuthUrlDTO {
-    const clientId = process.env.BLING_CLIENT_ID!;
+  generateAuthURL(state?: string, clientId?: string, clientSecret?: string): BlingAuthUrlDTO {
+    const finalClientId = clientId || process.env.BLING_CLIENT_ID!;
+    const finalClientSecret = clientSecret || process.env.BLING_CLIENT_SECRET!;
     const redirectUri = process.env.BLING_REDIRECT_URI!;
     const scope = process.env.BLING_SCOPE || 'all';
     const s = state || crypto.randomBytes(16).toString('hex');
 
+    // Incluir client_id e client_secret no state para recuperar no callback
+    const stateData = Buffer.from(JSON.stringify({
+      state: s,
+      client_id: finalClientId,
+      client_secret: finalClientSecret
+    })).toString('base64');
+
     const url = new URL(this.BLING_AUTHORIZE_URL);
-    url.searchParams.set('client_id', clientId);
+    url.searchParams.set('client_id', finalClientId);
     url.searchParams.set('redirect_uri', redirectUri);
     url.searchParams.set('response_type', 'code');
     url.searchParams.set('scope', scope);
-    url.searchParams.set('state', s);
+    url.searchParams.set('state', stateData);
 
     logger.auth('URL de autorização Bling gerada');
 
     return { url: url.toString(), state: s };
   }
 
-  async exchangeCode(code: string): Promise<void> {
-    const clientId = process.env.BLING_CLIENT_ID!;
-    const clientSecret = process.env.BLING_CLIENT_SECRET!;
+  async exchangeCode(code: string, clientId?: string, clientSecret?: string): Promise<void> {
+    const finalClientId = clientId || process.env.BLING_CLIENT_ID!;
+    const finalClientSecret = clientSecret || process.env.BLING_CLIENT_SECRET!;
 
     logger.auth('Trocando código de autorização por tokens...');
 
     try {
       const basicAuth = Buffer
-        .from(`${clientId}:${clientSecret}`)
+        .from(`${finalClientId}:${finalClientSecret}`)
         .toString('base64');
 
       const body = new URLSearchParams({
@@ -89,20 +97,58 @@ export class BlingOAuthService {
         calculatedMs: expiresInMs,
       });
 
-      // Desativa todos os tokens antigos antes de salvar o novo
-      await this.blingRepository.deactivateAll();
+      // Buscar company_id via API do Bling
+      let companyIdBling: string | undefined;
+      try {
+        const userResponse = await axios.get(
+          'https://www.bling.com.br/Api/v3/usuarios/me',
+          {
+            headers: {
+              Authorization: `Bearer ${access_token}`,
+              Accept: 'application/json',
+            },
+            timeout: 10000,
+          }
+        );
+        companyIdBling = userResponse.data?.data?.company?.id;
+        if (companyIdBling) {
+          logger.auth(`CompanyId Bling obtido: ${companyIdBling}`);
+        }
+      } catch {
+        logger.warn('Não foi possível obter companyId do Bling via /usuarios/me');
+      }
 
-      await this.blingRepository.save({
-        access_token,
-        refresh_token,
-        expires_at: expiresAt,
-        scope: scope || 'all',
-        token_type: token_type || 'Bearer',
-        access_token_url: this.BLING_TOKEN_URL,
-        client_id: clientId,
-        client_secret: clientSecret,
-        active: true
-      });
+      // Verificar se já existe um token para esta empresa
+      let existingToken = null;
+      if (companyIdBling) {
+        existingToken = await this.blingRepository.findByCompanyIdBling(companyIdBling);
+      }
+
+      if (existingToken) {
+        // Atualizar token existente da mesma empresa
+        logger.auth(`Atualizando token existente para empresa ${companyIdBling}`);
+        await this.blingRepository.update(existingToken.id, {
+          access_token,
+          refresh_token,
+          expires_at: expiresAt,
+          scope: scope || 'all',
+          token_type: token_type || 'Bearer',
+        });
+      } else {
+        // Criar novo token (sem desativar os outros)
+        await this.blingRepository.save({
+          access_token,
+          refresh_token,
+          expires_at: expiresAt,
+          scope: scope || 'all',
+          token_type: token_type || 'Bearer',
+          access_token_url: this.BLING_TOKEN_URL,
+          client_id: finalClientId,
+          client_secret: finalClientSecret,
+          active: true,
+          company_id_bling: companyIdBling
+        });
+      }
 
       logger.success('Tokens Bling obtidos e armazenados com sucesso');
     } catch (error: any) {

@@ -60,7 +60,7 @@ export class BlingHttpClient {
     if (expiresAt && expiresAt.getTime() - now.getTime() < 5 * 60 * 1000) {
       logger.auth('Token Bling expirado ou prestes a expirar. Renovando...');
       await this.blingOAuthService.refreshAccessToken(token.id);
-      const refreshedToken = await this.blingRepository.findActive();
+      const refreshedToken = await this.blingRepository.findById(token.id);
       return refreshedToken!.access_token;
     }
 
@@ -83,8 +83,8 @@ export class BlingHttpClient {
     return this.request<T>('PATCH', url, config, data, 3, 1000, tokenId);
   }
 
-  async getPedido(id: number): Promise<BlingPedidoResponse> {
-    return this.get<BlingPedidoResponse>(`/pedidos/vendas/${id}`);
+  async getPedido(id: number, tokenId?: string): Promise<BlingPedidoResponse> {
+    return this.get<BlingPedidoResponse>(`/pedidos/vendas/${id}`, undefined, tokenId);
   }
 
   async getFormaPagamentoById(id: number | string): Promise<BlingFormaPagamentoResponse> {
@@ -131,11 +131,14 @@ export class BlingHttpClient {
     } catch (error: any) {
       if (error.response?.status === 401) {
         logger.auth('Token Bling rejeitado (401). Tentando renovar...');
-        const token = await this.blingRepository.findActive();
+        // Usar o tokenId original para renovar o token correto
+        const token = tokenId
+          ? await this.blingRepository.findById(tokenId)
+          : await this.blingRepository.findActive();
         if (token) {
           try {
             await this.blingOAuthService.refreshAccessToken(token.id);
-            const refreshedToken = await this.blingRepository.findActive();
+            const refreshedToken = await this.blingRepository.findById(token.id);
             if (refreshedToken) {
               const retryResponse = await this.client.request<T>({
                 method,

@@ -24,6 +24,8 @@ export const saveTokenSchema = z.object({
   scope: z.string().optional(),
   token_type: z.string().optional(),
   active: z.boolean().optional().default(true),
+  nome_unidade: z.string().optional(),
+  company_id_bling: z.string().optional(),
 });
 
 export type SaveTokenInput = z.infer<typeof saveTokenSchema>;

@@ -12,9 +12,10 @@ export class BlingTokenScheduler {
   ) {}
 
   async checkAndRefresh(): Promise<{ refreshed: boolean; message: string; authUrl?: string }> {
-    const token = await this.blingRepository.findActive();
+    const allTokens = await this.blingRepository.findAll();
+    const activeTokens = allTokens.filter(t => t.active);
 
-    if (!token) {
+    if (activeTokens.length === 0) {
       const { url: authUrl } = this.blingOAuthService.generateAuthURL();
       logger.auth('Nenhum token Bling ativo encontrado para renovação preventiva.');
       return {
@@ -24,58 +25,59 @@ export class BlingTokenScheduler {
       };
     }
 
-    const expiresAt = token.expires_at ? new Date(token.expires_at) : null;
-    const now = new Date();
+    let refreshedCount = 0;
+    let lastError: { message: string; authUrl?: string } | null = null;
 
-    if (!expiresAt) {
-      logger.auth('Token Bling não possui data de expiração. Renovação preventiva ignorada.');
-      return {
-        refreshed: false,
-        message: 'Token sem data de expiração.',
-      };
+    for (const token of activeTokens) {
+      const expiresAt = token.expires_at ? new Date(token.expires_at) : null;
+      const now = new Date();
+
+      if (!expiresAt) {
+        logger.auth(`Token ${token.id} (${token.nome_unidade || 'sem nome'}) não possui data de expiração. Ignorando.`);
+        continue;
+      }
+
+      const hoursUntilExpiry = (expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60);
+
+      if (hoursUntilExpiry > 24) {
+        logger.auth(`Token ${token.id} (${token.nome_unidade || 'sem nome'}) ainda válido por ${Math.round(hoursUntilExpiry)}h.`);
+        continue;
+      }
+
+      logger.auth(`Token ${token.id} (${token.nome_unidade || 'sem nome'}) expira em ${Math.round(hoursUntilExpiry)}h. Renovando...`);
+
+      try {
+        await this.blingOAuthService.refreshAccessToken(token.id);
+        refreshedCount++;
+        logger.success(`Token ${token.id} renovado com sucesso.`);
+      } catch (error) {
+        if (error instanceof RefreshTokenExpiredError) {
+          logger.error(`Refresh token do Bling ${token.id} expirado. É necessário autenticar novamente.`);
+          lastError = { message: error.message, authUrl: error.authUrl ?? undefined };
+        } else {
+          throw error;
+        }
+      }
     }
 
-    const hoursUntilExpiry = (expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60);
-
-    if (hoursUntilExpiry > 24) {
-      logger.auth(`Token Bling ainda válido por ${Math.round(hoursUntilExpiry)}h. Renovação não necessária.`);
-      return {
-        refreshed: false,
-        message: `Token ainda válido por ${Math.round(hoursUntilExpiry)}h.`,
-      };
-    }
-
-    logger.auth(`Token Bling expira em ${Math.round(hoursUntilExpiry)}h. Iniciando renovação preventiva...`);
-
-    try {
-      await this.blingOAuthService.refreshAccessToken(token.id);
-
-      const refreshedToken = await this.blingRepository.findActive();
-      const newExpiry = refreshedToken?.expires_at
-        ? new Date(refreshedToken.expires_at)
-        : null;
-      const newHours = newExpiry
-        ? Math.round((newExpiry.getTime() - Date.now()) / (1000 * 60 * 60))
-        : null;
-
-      logger.success(`Token Bling renovado preventivamente. Nova expiração em ${newHours}h.`);
-
+    if (refreshedCount > 0) {
       return {
         refreshed: true,
-        message: `Token renovado. Nova expiração em ${newHours}h.`,
+        message: `${refreshedCount} token(s) renovado(s) com sucesso.`,
       };
-    } catch (error) {
-      if (error instanceof RefreshTokenExpiredError) {
-        logger.error('Refresh token Bling expirado. É necessário autenticar novamente.', {
-          authUrl: error.authUrl
-        });
-        return {
-          refreshed: false,
-          message: error.message,
-          authUrl: error.authUrl ?? undefined,
-        };
-      }
-      throw error;
     }
+
+    if (lastError) {
+      return {
+        refreshed: false,
+        message: lastError.message,
+        authUrl: lastError.authUrl,
+      };
+    }
+
+    return {
+      refreshed: false,
+      message: `Todos os ${activeTokens.length} token(s) ainda válidos.`,
+    };
   }
 }

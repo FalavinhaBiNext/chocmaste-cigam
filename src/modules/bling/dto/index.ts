@@ -9,6 +9,7 @@ export interface CreateBlingTokenDTO {
   client_secret?: string;
   active?: boolean;
   nome_unidade?: string;
+  company_id_bling?: string;
 }
 
 export interface ResponseBlingTokenDTO {
@@ -23,6 +24,7 @@ export interface ResponseBlingTokenDTO {
   client_secret: string;
   active: boolean;
   nome_unidade: string | null;
+  company_id_bling: string | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -38,6 +40,7 @@ export interface UpdateBlingTokenDTO {
   token_type?: string;
   active?: boolean;
   nome_unidade?: string;
+  company_id_bling?: string;
 }
 
 export interface BlingAuthUrlDTO {

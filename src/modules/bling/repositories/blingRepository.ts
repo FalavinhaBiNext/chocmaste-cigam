@@ -31,6 +31,14 @@ export class BlingRepository implements IBlingTokenRepository {
     return BlingMapper.tokenToDTO(token);
   }
 
+  async findByCompanyIdBling(companyIdBling: string): Promise<ResponseBlingTokenDTO | null> {
+    const token = await BlingModel.findOne({
+      where: { company_id_bling: companyIdBling, active: true },
+    });
+    if (!token) return null;
+    return BlingMapper.tokenToDTO(token);
+  }
+
   async deactivateAll(): Promise<void> {
     await BlingModel.update({ active: false }, { where: { active: true } });
   }
@@ -52,7 +60,8 @@ export class BlingRepository implements IBlingTokenRepository {
       client_id: data.client_id || process.env.BLING_CLIENT_ID!,
       client_secret: data.client_secret || process.env.BLING_CLIENT_SECRET!,
       active: data.active !== undefined ? data.active : true,
-      nome_unidade: data.nome_unidade
+      nome_unidade: data.nome_unidade,
+      company_id_bling: data.company_id_bling
     });
     return BlingMapper.tokenToDTO(token);
   }

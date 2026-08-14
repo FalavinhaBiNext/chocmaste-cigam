@@ -15,6 +15,7 @@ export class BlingMapper {
       client_secret: data.client_secret,
       active: data.active,
       nome_unidade: data.nome_unidade,
+      company_id_bling: data.company_id_bling,
       created_at: data.created_at,
       updated_at: data.updated_at
     }
