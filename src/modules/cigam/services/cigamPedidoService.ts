@@ -117,7 +117,7 @@ export class CigamPedidoService {
       Observacao: partesObservacao.join(' - ').toUpperCase(),
       CopiarObservacoesCliente: true,
       PrazoEntrega: prazo,
-      PrazoProgramado: prazo,
+      PrazoProgramado: pedidoBling.dataPrevisao || prazo,
       OrigemPedido: 'Bling Integration',
       UnidadeNegocio: unidadeNegocio || ''
     };
