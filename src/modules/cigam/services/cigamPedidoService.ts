@@ -158,9 +158,9 @@ export class CigamPedidoService {
       await delay(200); // pequeno delay entre itens
     }
 
-    // 8. Aguardar 5 segundos para processamento do CIGAM antes de verificar/atualizar
-    logger.info('Aguardando 5 segundos para processamento do CIGAM...');
-    await delay(5000);
+    // 8. Aguardar processamento do CIGAM antes de verificar/atualizar
+    logger.info('Aguardando 10 segundos para processamento do CIGAM...');
+    await delay(10000);
 
     // 9. Verificar existência do pedido e atualizar frete/desconto (sem autenticação)
     const urlPedidoCigam = `${baseUrl}/hub_pedido/api/pedidos/${codigoPedidoCigam}`;
@@ -171,6 +171,7 @@ export class CigamPedidoService {
         : undefined;
 
     logger.info(`Verificando existência do pedido CIGAM #${codigoPedidoCigam}...`);
+    logger.info(`URL da requisição GET: ${urlPedidoCigam}`);
     const pedidoCigam = await axios.get(urlPedidoCigam, { httpsAgent }).then(r => r.data).catch(() => null);
 
     if (!pedidoCigam) {
@@ -178,6 +179,7 @@ export class CigamPedidoService {
     }
 
     logger.success(`Pedido CIGAM #${codigoPedidoCigam} encontrado. Atualizando frete e desconto...`);
+    logger.info(`URL da requisição PATCH: ${urlPedidoCigam}`);
     await axios.patch(urlPedidoCigam, {
       valorDesconto: descontoValor,
       valorFrete: valorFrete,
