@@ -106,6 +106,8 @@ export class CigamClienteService {
         CodigoPais: '031'
       };
 
+      logger.info('Payload enviado para criar cliente no CIGAM', payload);
+
       try {
         const response: any = await this.cigamHttpClient.post(
           baseUrl,
@@ -113,6 +115,8 @@ export class CigamClienteService {
           '/API/api/genericos/ge/Pessoa/Salvar',
           payload
         );
+
+        logger.info('Resposta do CIGAM ao criar cliente', { response });
 
         if (response && response.Codigo) {
           idCigam = String(response.Codigo);
@@ -136,6 +140,12 @@ export class CigamClienteService {
           }
         }
       } catch (postError: any) {
+        logger.error('Erro detalhado ao cadastrar cliente no CIGAM', {
+          message: postError.message,
+          response: postError.response?.data,
+          status: postError.response?.status,
+          payload
+        });
         throw new Error(`Falha ao cadastrar cliente no CIGAM: ${postError.message}`);
       }
 
