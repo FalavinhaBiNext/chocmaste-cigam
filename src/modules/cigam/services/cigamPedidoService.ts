@@ -158,7 +158,11 @@ export class CigamPedidoService {
       await delay(200); // pequeno delay entre itens
     }
 
-    // 8. Verificar existência do pedido e atualizar frete/desconto (sem autenticação)
+    // 8. Aguardar 5 segundos para processamento do CIGAM antes de verificar/atualizar
+    logger.info('Aguardando 5 segundos para processamento do CIGAM...');
+    await delay(5000);
+
+    // 9. Verificar existência do pedido e atualizar frete/desconto (sem autenticação)
     const urlPedidoCigam = `${baseUrl}/hub_pedido/api/pedidos/${codigoPedidoCigam}`;
 
     const httpsAgent =
