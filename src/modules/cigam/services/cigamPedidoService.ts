@@ -170,9 +170,11 @@ export class CigamPedidoService {
         ? new https.Agent({ rejectUnauthorized: false })
         : undefined;
 
+    const headersCigam = { 'X-Api-Key': 'eb6f0ff4-0169-4806-b8be-6e524e7f8f869eed5c75aa1e42c983ceacf977a51ced' };
+
     logger.info(`Verificando existência do pedido CIGAM #${codigoPedidoCigam}...`);
     logger.info(`URL da requisição GET: ${urlPedidoCigam}`);
-    const pedidoCigam = await axios.get(urlPedidoCigam, { httpsAgent }).then(r => r.data).catch(() => null);
+    const pedidoCigam = await axios.get(urlPedidoCigam, { httpsAgent, headers: headersCigam }).then(r => r.data).catch(() => null);
 
     if (!pedidoCigam) {
       throw new Error(`Pedido CIGAM #${codigoPedidoCigam} não encontrado após criação.`);
@@ -183,7 +185,7 @@ export class CigamPedidoService {
     await axios.patch(urlPedidoCigam, {
       valorDesconto: descontoValor,
       valorFrete: valorFrete,
-    }, { httpsAgent });
+    }, { httpsAgent, headers: headersCigam });
 
     logger.success(`Pedido Bling #${pedidoBling.numero} integrado ao CIGAM com sucesso!`);
     return codigoPedidoCigam;
