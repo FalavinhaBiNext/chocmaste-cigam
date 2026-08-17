@@ -7,6 +7,7 @@ export interface IPedidoRepository {
   findById(id: string): Promise<ResponsePedidoDTO | null>;
   findByIdBling(idBling: string): Promise<ResponsePedidoDTO | null>;
   findByNumeroLoja(numeroLoja: string): Promise<ResponsePedidoDTO | null>;
+  findByNumeroPedidoCigam(numeroPedidoCigam: string): Promise<ResponsePedidoDTO | null>;
   update(id: string, data: UpdatePedidoDTO): Promise<ResponsePedidoDTO | null>;
   delete(id: string): Promise<void>;
 }

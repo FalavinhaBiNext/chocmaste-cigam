@@ -25,6 +25,9 @@ export class PedidoMapper {
       codigo_rastreio: data.codigo_rastreio,
       unidade_negocio: data.unidade_negocio,
       data_prevista: data.data_prevista,
+      numero_pedido_cigam: data.numero_pedido_cigam,
+      marketplace: data.marketplace,
+      status_nfe: data.status_nfe,
       created_at: data.created_at,
       updated_at: data.updated_at
     }

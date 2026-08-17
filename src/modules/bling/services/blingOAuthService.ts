@@ -118,6 +118,11 @@ export class BlingOAuthService {
         logger.warn('Não foi possível obter companyId do Bling via /usuarios/me');
       }
 
+      // Desativar todas as contas existentes antes de salvar a nova
+      // Garante que apenas uma conta Bling fique ativa por vez
+      await this.blingRepository.deactivateAll();
+      logger.auth('Todas as contas Bling anteriores foram desativadas');
+
       // Verificar se já existe um token para esta empresa
       let existingToken = null;
       if (companyIdBling) {
@@ -133,9 +138,10 @@ export class BlingOAuthService {
           expires_at: expiresAt,
           scope: scope || 'all',
           token_type: token_type || 'Bearer',
+          active: true,
         });
       } else {
-        // Criar novo token (sem desativar os outros)
+        // Criar novo token como ativo
         await this.blingRepository.save({
           access_token,
           refresh_token,

@@ -186,10 +186,20 @@ import { MercadoLivreTokenRepository } from '@/modules/mercadoLivre/repositories
 import { MercadoLivreAuthService } from '@/modules/mercadoLivre/services/mercadoLivreAuthService';
 import { MercadoLivreHttpClient } from '@/modules/mercadoLivre/services/mercadoLivreHttpClient';
 import { MercadoLivreController } from '@/modules/mercadoLivre/controllers/mercadoLivreController';
+import { MercadoLivreFiscalService } from '@/modules/mercadoLivre/services/mercadoLivreFiscalService';
 
 container.registerSingleton(MercadoLivreTokenRepository);
 container.registerSingleton(MercadoLivreAuthService);
 container.registerSingleton(MercadoLivreHttpClient);
 container.registerSingleton(MercadoLivreController);
+container.registerSingleton(MercadoLivreFiscalService);
+
+import { NotasFiscaisCigamRepository } from '@/modules/notasFiscaisCigam/repositories/notasFiscaisCigamRepository';
+import { NotasFiscaisCigamService } from '@/modules/notasFiscaisCigam/services/notasFiscaisCigamService';
+import { NotasFiscaisCigamController } from '@/modules/notasFiscaisCigam/controllers/notasFiscaisCigamController';
+
+container.registerSingleton(NotasFiscaisCigamRepository);
+container.registerSingleton(NotasFiscaisCigamService);
+container.registerSingleton(NotasFiscaisCigamController);
 
 export { container };

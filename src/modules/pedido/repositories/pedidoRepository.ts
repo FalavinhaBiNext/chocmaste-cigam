@@ -78,6 +78,18 @@ export class PedidoRepository implements IPedidoRepository {
     return PedidoMapper.pedidoToDTO(pedido);
   }
 
+  async findByNumeroPedidoCigam(numeroPedidoCigam: string): Promise<ResponsePedidoDTO | null> {
+    const pedido = await PedidoModel.findOne({
+      where: { numero_pedido_cigam: numeroPedidoCigam }
+    });
+
+    if (!pedido) {
+      return null;
+    }
+
+    return PedidoMapper.pedidoToDTO(pedido);
+  }
+
   async update(id: string, data: UpdatePedidoDTO): Promise<ResponsePedidoDTO | null> {
     const pedido = await PedidoModel.findByPk(id);
 

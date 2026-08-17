@@ -23,6 +23,9 @@ export class PedidoModel extends Model {
   public codigo_rastreio!: string;
   public unidade_negocio!: string | null;
   public data_prevista!: string | null;
+  public numero_pedido_cigam!: string | null;
+  public marketplace!: string | null;
+  public status_nfe!: string | null;
   public readonly created_at!: Date;
   public readonly updated_at!: Date;
 }
@@ -113,6 +116,19 @@ PedidoModel.init({
   data_prevista: {
     type: Sequelize.DATEONLY,
     allowNull: true
+  },
+  numero_pedido_cigam: {
+    type: Sequelize.STRING,
+    allowNull: true
+  },
+  marketplace: {
+    type: Sequelize.STRING,
+    allowNull: true
+  },
+  status_nfe: {
+    type: Sequelize.STRING,
+    allowNull: true,
+    defaultValue: 'pendente'
   }
 }, {
   sequelize,

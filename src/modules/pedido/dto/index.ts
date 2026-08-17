@@ -19,6 +19,9 @@ export interface CreatePedidoDTO {
   codigo_rastreio: string;
   unidade_negocio?: string;
   data_prevista?: string;
+  numero_pedido_cigam?: string;
+  marketplace?: string;
+  status_nfe?: string;
 }
 
 export interface ResponsePedidoDTO {
@@ -43,6 +46,9 @@ export interface ResponsePedidoDTO {
   codigo_rastreio: string;
   unidade_negocio: string | null;
   data_prevista: string | null;
+  numero_pedido_cigam: string | null;
+  marketplace: string | null;
+  status_nfe: string | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -68,4 +74,7 @@ export interface UpdatePedidoDTO {
   codigo_rastreio?: string;
   unidade_negocio?: string;
   data_prevista?: string;
+  numero_pedido_cigam?: string;
+  marketplace?: string;
+  status_nfe?: string;
 }

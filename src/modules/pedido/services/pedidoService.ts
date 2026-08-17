@@ -59,6 +59,17 @@ export class PedidoService {
     return pedido;
   }
 
+  async findByNumeroPedidoCigam(numeroPedidoCigam: string): Promise<ResponsePedidoDTO | null> {
+    logger.info(`Searching pedido with numeroPedidoCigam: ${numeroPedidoCigam}`);
+    const pedido = await this.pedidoRepository.findByNumeroPedidoCigam(numeroPedidoCigam);
+    if (!pedido) {
+      logger.info(`Pedido with numeroPedidoCigam: ${numeroPedidoCigam} not found`);
+      return null;
+    }
+    logger.finish('Pedido found');
+    return pedido;
+  }
+
   async update(id: string, data: UpdatePedidoDTO): Promise<ResponsePedidoDTO> {
     logger.info(`Starting update pedido with ID: ${id}`);
     const pedidoExistence = await this.pedidoRepository.findById(id);

@@ -217,6 +217,13 @@ export class WebhookService {
         cigamPedidoId = await this.cigamPedidoService.enviarPedido(data, unidadeNegocio);
         cigamSincronizado = true;
         logger.webhook('Pedido enviado e integrado com sucesso no CIGAM', { eventId: payload.eventId });
+
+        if (cigamPedidoId) {
+          await this.pedidoService.update(pedido.id, {
+            numero_pedido_cigam: cigamPedidoId,
+          });
+          logger.webhook(`Código do pedido CIGAM (${cigamPedidoId}) salvo no pedido local`, { pedidoId: pedido.id });
+        }
       } catch (cigamError: any) {
         logger.error(`Falha ao integrar pedido Bling #${data.numero} no CIGAM: ${cigamError.message}`);
       }

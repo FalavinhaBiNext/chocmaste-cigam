@@ -76,6 +76,11 @@ export class MercadoLivreAuthService {
       logger.warn('Não foi possível obter dados do usuário ML.');
     }
 
+    // Desativar todas as contas existentes antes de salvar a nova
+    // Garante que apenas uma conta Mercado Livre fique ativa por vez
+    await this.tokenRepository.deactivateAll();
+    logger.auth('Todas as contas Mercado Livre anteriores foram desativadas');
+
     // Salvar token no banco
     const expiresAt = new Date();
     expiresAt.setSeconds(expiresAt.getSeconds() + tokenData.expires_in);

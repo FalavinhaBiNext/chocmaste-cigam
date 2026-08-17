@@ -22,6 +22,9 @@ export const createPedidoSchema = z.object({
   codigo_rastreio: z.string().min(1, 'codigo_rastreio é obrigatório.'),
   unidade_negocio: z.string().optional(),
   data_prevista: z.string().optional(),
+  numero_pedido_cigam: z.string().optional(),
+  marketplace: z.string().optional(),
+  status_nfe: z.string().optional(),
 });
 
 export type CreatePedidoInput = z.infer<typeof createPedidoSchema>;
