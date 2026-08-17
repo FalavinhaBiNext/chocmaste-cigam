@@ -1,8 +1,9 @@
 import { injectable, inject } from 'tsyringe';
 import { Request, Response } from 'express';
 import { NotasFiscaisCigamService } from '../services/notasFiscaisCigamService';
-import { validateReceberNotaFiscal } from '../notasFiscaisCigam.validator';
+import { validateReceberNotaFiscalBody } from '../notasFiscaisCigam.validator';
 import { logger } from '@/shared/utils/logger';
+import { ValidationError } from '@/shared/errors/AppError';
 
 @injectable()
 export class NotasFiscaisCigamController {
@@ -12,16 +13,36 @@ export class NotasFiscaisCigamController {
   ) {}
 
   receberWebhook = async (req: Request, res: Response): Promise<void> => {
-    logger.webhook('[NF-E CIGAM] Webhook de NF-e recebido', { body: req.body });
+    logger.webhook('[NF-E CIGAM] Webhook de NF-e recebido');
 
-    const input = validateReceberNotaFiscal(req.body);
+    // Verificar se o arquivo XML foi enviado
+    if (!req.file) {
+      throw new ValidationError('Arquivo XML é obrigatório. Envie como multipart/form-data no campo "xml".');
+    }
+
+    // Ler conteúdo do arquivo XML
+    const xmlContent = req.file.buffer.toString('utf-8');
+
+    // Validar campos do body
+    const bodyData = validateReceberNotaFiscalBody(req.body);
+
+    // Combinar dados do body com o conteúdo do XML
+    const input = {
+      ...bodyData,
+      xml: xmlContent,
+    };
 
     const result = await this.notasFiscaisCigamService.receberNotaFiscal(input);
 
     res.status(201).json({
       success: true,
       message: 'NF-e recebida e registrada com sucesso.',
-      data: result,
+      data: {
+        id: result.id,
+        numero_pedido_cigam: result.numero_pedido_cigam,
+        numero_pedido_marketplace: result.numero_pedido_marketplace,
+        enviado_marketplace: result.enviado_marketplace,
+      },
     });
   }
 
@@ -35,7 +56,7 @@ export class NotasFiscaisCigamController {
   }
 
   buscarPorId = async (req: Request, res: Response): Promise<void> => {
-    const { id } = req.params;
+    const id = String(req.params.id);
 
     const nota = await this.notasFiscaisCigamService.findById(id);
 
@@ -55,7 +76,7 @@ export class NotasFiscaisCigamController {
   }
 
   marcarEnviada = async (req: Request, res: Response): Promise<void> => {
-    const { id } = req.params;
+    const id = String(req.params.id);
 
     await this.notasFiscaisCigamService.updateEnviadoMarketplace(id, true);
 
