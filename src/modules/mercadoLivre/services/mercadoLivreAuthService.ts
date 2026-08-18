@@ -4,8 +4,8 @@ import { MercadoLivreTokenRepository } from '../repositories/mercadoLivreTokenRe
 import { MercadoLivreTokenResponse, MercadoLivreUserResponse } from '../dto';
 import { logger } from '@/shared/utils/logger';
 
-const ML_API_BASE = 'https://api.mercadolibre.com';
-const ML_AUTH_URL = 'https://auth.mercadolibre.com.br';
+const ML_API_BASE = 'https://api.mercadolivre.com.br';
+const ML_AUTH_URL = 'https://auth.mercadolivre.com.br';
 
 @injectable()
 export class MercadoLivreAuthService {
@@ -33,7 +33,7 @@ export class MercadoLivreAuthService {
 
   /**
    * Troca o authorization_code por access_token e refresh_token.
-   * Endpoint: POST https://api.mercadolibre.com/oauth/token
+   * Endpoint: POST https://api.mercadolivre.com.br/oauth/token
    */
   async exchangeCodeForToken(
     code: string,
@@ -105,7 +105,7 @@ export class MercadoLivreAuthService {
 
   /**
    * Renova o access_token usando o refresh_token.
-   * Endpoint: POST https://api.mercadolibre.com/oauth/token
+   * Endpoint: POST https://api.mercadolivre.com.br/oauth/token
    * IMPORTANTE: O refresh_token é de uso único. Um novo refresh_token é retornado a cada renovação.
    */
   async refreshAccessToken(refreshToken: string, appId: string): Promise<MercadoLivreTokenResponse> {
