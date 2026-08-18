@@ -8,6 +8,7 @@ export class NotasFiscaisCigamRepository {
     const nota = await NotasFiscaisCigamModel.create({
       numero_pedido_cigam: data.numero_pedido_cigam,
       numero_pedido_marketplace: data.numero_pedido_marketplace,
+      marketplace: data.marketplace,
       unidade_negocio: data.unidade_negocio,
       data_faturamento: data.data_faturamento,
       numero_nf: data.numero_nf,
@@ -70,6 +71,7 @@ export class NotasFiscaisCigamRepository {
       id: data.id,
       numero_pedido_cigam: data.numero_pedido_cigam,
       numero_pedido_marketplace: data.numero_pedido_marketplace,
+      marketplace: data.marketplace,
       unidade_negocio: data.unidade_negocio,
       data_faturamento: data.data_faturamento,
       numero_nf: data.numero_nf,

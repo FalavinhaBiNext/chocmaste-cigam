@@ -46,6 +46,7 @@ export class NotasFiscaisCigamService {
     const nota = await this.notasFiscaisCigamRepository.create({
       numero_pedido_cigam: input.numeroPedido,
       numero_pedido_marketplace: numeroPedidoMarketplace,
+      marketplace: pedidoVinculado?.marketplace || null,
       unidade_negocio: input.unidadeNegocio,
       data_faturamento: input.dataFaturamento,
       numero_nf: input.numeroNf,

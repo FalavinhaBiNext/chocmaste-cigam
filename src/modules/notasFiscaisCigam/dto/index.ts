@@ -1,6 +1,7 @@
 export interface CreateNotaFiscalCigamDTO {
   numero_pedido_cigam: string;
   numero_pedido_marketplace?: string;
+  marketplace?: string;
   unidade_negocio?: string;
   data_faturamento?: string;
   numero_nf?: string;
@@ -14,6 +15,7 @@ export interface ResponseNotaFiscalCigamDTO {
   id: string;
   numero_pedido_cigam: string;
   numero_pedido_marketplace: string | null;
+  marketplace: string | null;
   unidade_negocio: string | null;
   data_faturamento: string | null;
   numero_nf: string | null;

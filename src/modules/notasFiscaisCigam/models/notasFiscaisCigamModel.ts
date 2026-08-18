@@ -5,6 +5,7 @@ export class NotasFiscaisCigamModel extends Model {
   public id!: string;
   public numero_pedido_cigam!: string;
   public numero_pedido_marketplace!: string | null;
+  public marketplace!: string | null;
   public unidade_negocio!: string | null;
   public data_faturamento!: string | null;
   public numero_nf!: string | null;
@@ -30,6 +31,11 @@ NotasFiscaisCigamModel.init({
   numero_pedido_marketplace: {
     type: Sequelize.STRING,
     allowNull: true,
+  },
+  marketplace: {
+    type: Sequelize.STRING,
+    allowNull: true,
+    defaultValue: null,
   },
   unidade_negocio: {
     type: Sequelize.STRING,
