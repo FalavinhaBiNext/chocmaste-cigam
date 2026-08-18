@@ -5,7 +5,7 @@ import { MercadoLivreTokenResponse, MercadoLivreUserResponse } from '../dto';
 import { logger } from '@/shared/utils/logger';
 
 const ML_API_BASE = 'https://api.mercadolibre.com';
-const ML_AUTH_URL = 'https://auth.mercadolibre.com.ar';
+const ML_AUTH_URL = 'https://auth.mercadolibre.com.br';
 
 @injectable()
 export class MercadoLivreAuthService {
