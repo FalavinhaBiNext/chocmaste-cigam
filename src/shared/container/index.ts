@@ -202,4 +202,12 @@ container.registerSingleton(NotasFiscaisCigamRepository);
 container.registerSingleton(NotasFiscaisCigamService);
 container.registerSingleton(NotasFiscaisCigamController);
 
+import { ShopeeTokenRepository } from '@/modules/shopee/repositories/shopeeTokenRepository';
+import { ShopeeAuthService } from '@/modules/shopee/services/shopeeAuthService';
+import { ShopeeController } from '@/modules/shopee/controllers/shopeeController';
+
+container.registerSingleton(ShopeeTokenRepository);
+container.registerSingleton(ShopeeAuthService);
+container.registerSingleton(ShopeeController);
+
 export { container };

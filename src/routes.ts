@@ -64,6 +64,9 @@ import { createAuthRoutes } from './modules/auth/routes/auth.routes';
 import { NotasFiscaisCigamController } from './modules/notasFiscaisCigam/controllers/notasFiscaisCigamController';
 import { createNotasFiscaisCigamRoutes } from './modules/notasFiscaisCigam/routes/notasFiscaisCigam.routes';
 
+import { ShopeeController } from './modules/shopee/controllers/shopeeController';
+import { createShopeeRoutes } from './modules/shopee/routes/shopee.routes';
+
 const routes = Router();
 
 const eventController = container.resolve(EventController);
@@ -93,6 +96,7 @@ const configuracoesController = container.resolve(ConfiguracoesController)
 const mercadoLivreController = container.resolve(MercadoLivreController)
 const usuarioController = container.resolve(UsuarioController)
 const notasFiscaisCigamController = container.resolve(NotasFiscaisCigamController)
+const shopeeController = container.resolve(ShopeeController)
 
 routes.use('/events', createEventRoutes(eventController));
 routes.use('/bling', createBlingRoutes(blingController, blingTokenController));
@@ -117,6 +121,7 @@ routes.use('/bling/produto-sync', createBlingProdutoSyncRoutes(blingProdutoSyncC
 routes.use('/cigam/materiais-integrador', createCigamMateriaisIntegradorRoutes(cigamMateriaisIntegradorController))
 routes.use('/configuracoes', createConfiguracoesRoutes(configuracoesController))
 routes.use('/mercado-livre', createMercadoLivreRoutes(mercadoLivreController))
+routes.use('/shopee', createShopeeRoutes(shopeeController))
 routes.use('/notas-fiscais-cigam', createNotasFiscaisCigamRoutes(notasFiscaisCigamController))
 routes.use('/auth', createAuthRoutes(usuarioController))
 
