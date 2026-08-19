@@ -18,6 +18,8 @@ export class MercadoLivreController {
    * GET /mercado-livre/auth-url
    */
   getAuthUrl = async (_req: Request, res: Response) => {
+    logger.route('Endpoint GET /mercado-livre/auth-url chamado');
+
     const appId = process.env.ML_APP_ID;
     const redirectUri = process.env.ML_REDIRECT_URI;
 
@@ -29,8 +31,12 @@ export class MercadoLivreController {
       return;
     }
 
+    logger.auth('Gerando URL de autorização do Mercado Livre');
+
     const state = Math.random().toString(36).substring(2, 15);
     const authUrl = this.authService.generateAuthURL(appId, redirectUri, state);
+
+    logger.success('URL de autorização gerada com sucesso', { authUrl });
 
     res.status(200).json({
       success: true,
@@ -43,15 +49,20 @@ export class MercadoLivreController {
    * GET /mercado-livre/callback?code=xxx&state=xxx
    */
   handleCallback = async (req: Request, res: Response) => {
+    logger.route('Endpoint GET /mercado-livre/callback chamado');
+
     const { code } = req.query;
 
     if (!code) {
+      logger.warn('Callback do Mercado Livre sem código de autorização');
       res.status(400).json({
         success: false,
         message: 'Código de autorização não fornecido.',
       });
       return;
     }
+
+    logger.auth(`Código de autorização recebido: ${String(code).substring(0, 10)}...`);
 
     const appId = process.env.ML_APP_ID;
     const clientSecret = process.env.ML_CLIENT_SECRET;
@@ -66,12 +77,16 @@ export class MercadoLivreController {
     }
 
     try {
+      logger.process('Iniciando troca de código por token');
+
       const tokenData = await this.authService.exchangeCodeForToken(
         String(code),
         appId,
         clientSecret,
         redirectUri,
       );
+
+      logger.success('Autenticação Mercado Livre concluída', { user_id: tokenData.user_id });
 
       res.status(200).json({
         success: true,

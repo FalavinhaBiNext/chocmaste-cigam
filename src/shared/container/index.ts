@@ -210,4 +210,12 @@ container.registerSingleton(ShopeeTokenRepository);
 container.registerSingleton(ShopeeAuthService);
 container.registerSingleton(ShopeeController);
 
+import { CanalVendaRepository } from '@/modules/canalVenda/repositories/canalVendaRepository';
+import { CanalVendaService } from '@/modules/canalVenda/services/canalVendaService';
+import { CanalVendaController } from '@/modules/canalVenda/controllers/canalVendaController';
+
+container.registerSingleton(CanalVendaRepository);
+container.registerSingleton(CanalVendaService);
+container.registerSingleton(CanalVendaController);
+
 export { container };
