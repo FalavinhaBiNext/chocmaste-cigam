@@ -70,6 +70,13 @@ export class PedidoService {
     return pedido;
   }
 
+  async findByIdLoja(idLoja: string): Promise<ResponsePedidoDTO[]> {
+    logger.info(`Searching pedidos with id_loja: ${idLoja}`);
+    const pedidos = await this.pedidoRepository.findByIdLoja(idLoja);
+    logger.success(`${pedidos.length} pedidos found for loja ${idLoja}`);
+    return pedidos;
+  }
+
   async update(id: string, data: UpdatePedidoDTO): Promise<ResponsePedidoDTO> {
     logger.info(`Starting update pedido with ID: ${id}`);
     const pedidoExistence = await this.pedidoRepository.findById(id);

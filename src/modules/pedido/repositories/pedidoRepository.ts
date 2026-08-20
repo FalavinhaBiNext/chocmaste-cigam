@@ -90,6 +90,14 @@ export class PedidoRepository implements IPedidoRepository {
     return PedidoMapper.pedidoToDTO(pedido);
   }
 
+  async findByIdLoja(idLoja: string): Promise<ResponsePedidoDTO[]> {
+    const pedidos = await PedidoModel.findAll({
+      where: { id_loja: idLoja },
+      order: [['data_pedido', 'DESC']],
+    });
+    return pedidos.map(PedidoMapper.pedidoToDTO);
+  }
+
   async update(id: string, data: UpdatePedidoDTO): Promise<ResponsePedidoDTO | null> {
     const pedido = await PedidoModel.findByPk(id);
 

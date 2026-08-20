@@ -73,6 +73,17 @@ export class PedidoController {
     })
   }
 
+  findByIdLoja = async (req: Request, res: Response) => {
+    const idLoja = String(req.params.idLoja);
+    const pedidos = await this.pedidoService.findByIdLoja(idLoja);
+
+    res.status(200).json({
+      success: true,
+      message: 'Pedidos retrieved successfully',
+      data: pedidos
+    })
+  }
+
   update = async (req: Request, res: Response) => {
     const id = String(req.params.id);
     const data = req.body;
