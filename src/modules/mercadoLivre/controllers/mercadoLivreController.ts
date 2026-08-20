@@ -172,8 +172,12 @@ export class MercadoLivreController {
   };
 
   /**
-   * Busca pedidos do usuário.
-   * GET /mercado-livre/orders?status=xxx
+   * Busca pedidos do usuário com dados completos do comprador.
+   * GET /mercado-livre/orders?status=xxx&limit=50
+   *
+   * O endpoint /orders/search retorna dados do comprador resumidos.
+   * Para obter first_name e last_name, é necessário buscar cada
+   * pedido individualmente via /orders/{id}.
    */
   listOrders = async (req: Request, res: Response) => {
     const { status, limit } = req.query;
@@ -184,10 +188,34 @@ export class MercadoLivreController {
       if (status) {
         url += `&status=${String(status)}`;
       }
-      const orders = await this.httpClient.get<any>(url);
+      const searchResult = await this.httpClient.get<any>(url);
+      const orderIds: number[] = searchResult.results || [];
+
+      if (orderIds.length === 0) {
+        res.status(200).json({
+          success: true,
+          data: { results: [], paging: searchResult.paging },
+        });
+        return;
+      }
+
+      // Buscar detalhes completos de cada pedido (com dados do comprador)
+      const fullOrders = await Promise.all(
+        orderIds.map(async (id: number) => {
+          try {
+            return await this.httpClient.get<any>(`/orders/${id}`);
+          } catch {
+            return null;
+          }
+        }),
+      );
+
       res.status(200).json({
         success: true,
-        data: orders,
+        data: {
+          results: fullOrders.filter(Boolean),
+          paging: searchResult.paging,
+        },
       });
     } catch (error: any) {
       res.status(500).json({
