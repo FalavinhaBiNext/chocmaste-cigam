@@ -13,6 +13,7 @@ export class CanalVendaRepository implements ICanalVendaRepository {
       tipo: data.tipo,
       situacao: data.situacao,
       ativo: data.ativo ?? true,
+      local_venda: data.local_venda,
       codigo_conta: data.codigo_conta,
     });
 
@@ -42,6 +43,18 @@ export class CanalVendaRepository implements ICanalVendaRepository {
   async findByIdBling(idBling: string): Promise<ResponseCanalVendaDTO | null> {
     const canalVenda = await CanalVendaModel.findOne({
       where: { id_bling: idBling }
+    });
+
+    if (!canalVenda) {
+      return null;
+    }
+
+    return CanalVendaMapper.canalVendaToDTO(canalVenda);
+  }
+
+  async findByLocalVenda(localVenda: string): Promise<ResponseCanalVendaDTO | null> {
+    const canalVenda = await CanalVendaModel.findOne({
+      where: { local_venda: localVenda }
     });
 
     if (!canalVenda) {

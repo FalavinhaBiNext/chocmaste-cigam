@@ -7,6 +7,7 @@ export const createCanalVendaSchema = z.object({
   tipo: z.string().optional(),
   situacao: z.string().optional(),
   ativo: z.boolean().optional().default(true),
+  local_venda: z.string().optional(),
   codigo_conta: z.string().optional(),
 });
 

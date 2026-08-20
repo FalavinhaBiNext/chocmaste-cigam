@@ -10,6 +10,7 @@ export class CanalVendaMapper {
       tipo: data.tipo,
       situacao: data.situacao,
       ativo: data.ativo,
+      local_venda: data.local_venda,
       codigo_conta: data.codigo_conta,
       created_at: data.created_at,
       updated_at: data.updated_at

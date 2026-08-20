@@ -4,7 +4,7 @@ import { MercadoLivreHttpClient } from './mercadoLivreHttpClient';
 import { MercadoLivreTokenRepository } from '../repositories/mercadoLivreTokenRepository';
 import { logger } from '@/shared/utils/logger';
 
-const ML_API_BASE = 'https://api.mercadolivre.com.br';
+const ML_API_BASE = 'https://api.mercadolibre.com';
 
 export interface EnviarNFeResult {
   success: boolean;

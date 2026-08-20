@@ -17,6 +17,7 @@ import { CigamPedidoService } from '@/modules/cigam/services/cigamPedidoService'
 import { BlingRepository } from '../repositories/blingRepository';
 import { DeParaUnidadesNegocioRepository } from '@/modules/depara/repositories/deparaUnidadesNegocioRepository';
 import { ConfiguracoesService } from '@/modules/configuracoes/services/configuracoesService';
+import { CanalVendaRepository } from '@/modules/canalVenda/repositories/canalVendaRepository';
 
 @injectable()
 export class WebhookService {
@@ -35,6 +36,7 @@ export class WebhookService {
     @inject(BlingRepository) private readonly blingRepository: BlingRepository,
     @inject(DeParaUnidadesNegocioRepository) private readonly deParaUnidadesNegocioRepo: DeParaUnidadesNegocioRepository,
     @inject(ConfiguracoesService) private readonly configuracoesService: ConfiguracoesService,
+    @inject(CanalVendaRepository) private readonly canalVendaRepository: CanalVendaRepository,
   ) {}
 
   private async resolveTokenId(companyId: string): Promise<string | undefined> {
@@ -136,6 +138,33 @@ export class WebhookService {
       }
     }
 
+    // Buscar codigo_conta a partir do canal de venda (loja)
+    let codigoConta: string | undefined;
+    const idLoja = String(data.loja.id);
+    const canalVenda = await this.canalVendaRepository.findByIdBling(idLoja);
+
+    // Extrair "Local de venda" das observações para refinar sub-marketplace (Tray)
+    const localVenda = extrairLocalVenda(data.observacoes);
+    if (localVenda) {
+      logger.webhook(`Local de venda extraído das observações: ${localVenda}`);
+    }
+
+    if (localVenda) {
+      const canalLocalVenda = await this.canalVendaRepository.findByLocalVenda(localVenda);
+      if (canalLocalVenda?.codigo_conta) {
+        codigoConta = canalLocalVenda.codigo_conta;
+        logger.webhook(`codigo_conta via local_venda "${localVenda}": ${codigoConta}`);
+      } else if (canalVenda?.codigo_conta) {
+        codigoConta = canalVenda.codigo_conta;
+        logger.webhook(`codigo_conta via id_bling ${idLoja} (sem match por local_venda): ${codigoConta}`);
+      }
+    } else if (canalVenda?.codigo_conta) {
+      codigoConta = canalVenda.codigo_conta;
+      logger.webhook(`codigo_conta via id_bling ${idLoja}: ${codigoConta}`);
+    } else {
+      logger.webhook(`Nenhum codigo_conta configurado para o canal de venda com id_bling: ${idLoja}`);
+    }
+
     let pedido;
     try {
       pedido = await this.pedidoService.findByIdBling(String(data.id));
@@ -161,6 +190,7 @@ export class WebhookService {
         codigo_rastreio: codigoRastreio,
         unidade_negocio: unidadeNegocio,
         data_prevista: data.dataPrevisao || undefined,
+        marketplace: localVenda || '',
       });
     } catch {
       pedido = await this.pedidoService.create({
@@ -184,6 +214,7 @@ export class WebhookService {
         codigo_rastreio: codigoRastreio,
         unidade_negocio: unidadeNegocio,
         data_prevista: data.dataPrevisao || undefined,
+        marketplace: localVenda || '',
       });
     }
 
@@ -214,7 +245,7 @@ export class WebhookService {
       logger.webhook('Envio automático para CIGAM está desativado. Pulando integração.', { eventId: payload.eventId });
     } else {
       try {
-        cigamPedidoId = await this.cigamPedidoService.enviarPedido(data, unidadeNegocio);
+        cigamPedidoId = await this.cigamPedidoService.enviarPedido(data, unidadeNegocio, codigoConta);
         cigamSincronizado = true;
         logger.webhook('Pedido enviado e integrado com sucesso no CIGAM', { eventId: payload.eventId });
 
@@ -320,4 +351,10 @@ export class WebhookService {
       return nova.id;
     }
   }
+}
+
+function extrairLocalVenda(observacoes: string): string | null {
+  if (!observacoes) return null;
+  const match = observacoes.match(/Local de venda:\s*(.+?)(?:\n|<|$)/i);
+  return match ? match[1].trim().toUpperCase() : null;
 }

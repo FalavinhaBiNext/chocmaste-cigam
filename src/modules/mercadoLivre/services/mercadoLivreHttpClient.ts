@@ -4,7 +4,7 @@ import { MercadoLivreTokenRepository } from '../repositories/mercadoLivreTokenRe
 import { MercadoLivreAuthService } from './mercadoLivreAuthService';
 import { logger } from '@/shared/utils/logger';
 
-const ML_API_BASE = 'https://api.mercadolivre.com.br';
+const ML_API_BASE = 'https://api.mercadolibre.com';
 
 @injectable()
 export class MercadoLivreHttpClient {

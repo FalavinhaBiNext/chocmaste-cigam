@@ -8,6 +8,7 @@ export class CanalVendaModel extends Model {
   public tipo!: string | null;
   public situacao!: string | null;
   public ativo!: boolean;
+  public local_venda!: string | null;
   public codigo_conta!: string | null;
   public readonly created_at!: Date;
   public readonly updated_at!: Date;
@@ -40,6 +41,10 @@ CanalVendaModel.init({
     type: Sequelize.BOOLEAN,
     allowNull: false,
     defaultValue: true
+  },
+  local_venda: {
+    type: Sequelize.STRING,
+    allowNull: true
   },
   codigo_conta: {
     type: Sequelize.STRING,

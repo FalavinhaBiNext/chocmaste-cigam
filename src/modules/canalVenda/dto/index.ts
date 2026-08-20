@@ -4,6 +4,7 @@ export interface CreateCanalVendaDTO {
   tipo?: string;
   situacao?: string;
   ativo?: boolean;
+  local_venda?: string;
   codigo_conta?: string;
 }
 
@@ -14,6 +15,7 @@ export interface ResponseCanalVendaDTO {
   tipo: string | null;
   situacao: string | null;
   ativo: boolean;
+  local_venda: string | null;
   codigo_conta: string | null;
   created_at: Date;
   updated_at: Date;
@@ -25,6 +27,7 @@ export interface UpdateCanalVendaDTO {
   tipo?: string;
   situacao?: string;
   ativo?: boolean;
+  local_venda?: string;
   codigo_conta?: string;
 }
 

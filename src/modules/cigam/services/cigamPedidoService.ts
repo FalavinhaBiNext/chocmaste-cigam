@@ -30,7 +30,7 @@ export class CigamPedidoService {
     return ativo.ambiente;
   }
 
-  async enviarPedido(pedidoBling: any, unidadeNegocio?: string): Promise<string> {
+  async enviarPedido(pedidoBling: any, unidadeNegocio?: string, codigoConta?: string): Promise<string> {
     logger.info(`Iniciando integração do pedido Bling #${pedidoBling.numero} para o CIGAM...`);
 
     // 1. Resolução do Cliente (obter ou criar dinamicamente)
@@ -121,7 +121,8 @@ export class CigamPedidoService {
       PrazoEntrega: prazo,
       PrazoProgramado: pedidoBling.dataPrevisao || prazo,
       OrigemPedido: 'Bling Integration',
-      UnidadeNegocio: unidadeNegocio || ''
+      UnidadeNegocio: unidadeNegocio || '',
+      ...(codigoConta ? { CodigoConta: codigoConta } : {}),
     };
 
     logger.info(`Enviando capa do pedido #${pedidoBling.numero} para o CIGAM...`);
