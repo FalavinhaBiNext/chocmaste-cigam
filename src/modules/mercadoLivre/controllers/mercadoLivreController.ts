@@ -300,6 +300,7 @@ export class MercadoLivreController {
           substatus,
           invoiceRequired: shipment.invoice_required ?? null,
           readyForInvoice,
+          substatusHistory: shipment.substatus_history || [],
         },
       });
     } catch (error: any) {
