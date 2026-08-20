@@ -3,6 +3,9 @@ import { Request, Response } from 'express';
 import { MercadoLivreAuthService } from '../services/mercadoLivreAuthService';
 import { MercadoLivreTokenRepository } from '../repositories/mercadoLivreTokenRepository';
 import { MercadoLivreHttpClient } from '../services/mercadoLivreHttpClient';
+import { MercadoLivreFiscalService } from '../services/mercadoLivreFiscalService';
+import { NotasFiscaisCigamRepository } from '@/modules/notasFiscaisCigam/repositories/notasFiscaisCigamRepository';
+import { PedidoService } from '@/modules/pedido/services/pedidoService';
 import { logger } from '@/shared/utils/logger';
 
 @injectable()
@@ -11,6 +14,9 @@ export class MercadoLivreController {
     @inject(MercadoLivreAuthService) private readonly authService: MercadoLivreAuthService,
     @inject(MercadoLivreTokenRepository) private readonly tokenRepository: MercadoLivreTokenRepository,
     @inject(MercadoLivreHttpClient) private readonly httpClient: MercadoLivreHttpClient,
+    @inject(MercadoLivreFiscalService) private readonly fiscalService: MercadoLivreFiscalService,
+    @inject(NotasFiscaisCigamRepository) private readonly notasFiscaisRepo: NotasFiscaisCigamRepository,
+    @inject(PedidoService) private readonly pedidoService: PedidoService,
   ) {}
 
   /**
@@ -297,6 +303,64 @@ export class MercadoLivreController {
         },
       });
     } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  };
+
+  /**
+   * Envia XML da NF-e para o Mercado Livre.
+   * POST /mercado-livre/orders/:orderId/send-invoice
+   */
+  sendInvoice = async (req: Request, res: Response) => {
+    const { orderId } = req.params;
+    try {
+      // Buscar nota fiscal não enviada para este pedido
+      const notas = await this.notasFiscaisRepo.findNotEnviadas();
+      const nota = notas.find((n: any) => n.numero_pedido_marketplace === String(orderId));
+
+      if (!nota) {
+        res.status(404).json({
+          success: false,
+          message: `Nenhuma NF-e pendente encontrada para o pedido ML #${orderId}.`,
+        });
+        return;
+      }
+
+      logger.info(`[ML INVOICE] Enviando NF-e ${nota.id} para pedido ML #${orderId}`);
+
+      const resultado = await this.fiscalService.enviarNFe(String(orderId), nota.xml_content);
+
+      if (resultado.success) {
+        await this.notasFiscaisRepo.updateEnviadoMarketplace(nota.id, true);
+
+        // Atualizar status_nfe do pedido
+        try {
+          const pedido = await this.pedidoService.findByIdBling(String(orderId));
+          if (pedido) {
+            await this.pedidoService.update(pedido.id, { status_nfe: 'enviada' });
+          }
+        } catch {
+          // Pedido pode não existir na tabela local
+        }
+
+        logger.success(`[ML INVOICE] NF-e enviada com sucesso. Shipment: ${resultado.shipmentId}`);
+        res.status(200).json({
+          success: true,
+          message: 'NF-e enviada com sucesso ao Mercado Livre.',
+          data: { shipmentId: resultado.shipmentId },
+        });
+      } else {
+        logger.warn(`[ML INVOICE] Falha no envio: ${resultado.error}`);
+        res.status(400).json({
+          success: false,
+          message: resultado.error || 'Erro ao enviar NF-e.',
+        });
+      }
+    } catch (error: any) {
+      logger.error(`[ML INVOICE] Erro ao enviar NF-e: ${error.message}`);
       res.status(500).json({
         success: false,
         message: error.message,
