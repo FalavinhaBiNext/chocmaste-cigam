@@ -272,4 +272,35 @@ export class MercadoLivreController {
       });
     }
   };
+
+  /**
+   * Consulta o status de um shipment para verificar se o envio de XML está liberado.
+   * GET /mercado-livre/shipments/:shipmentId/status
+   */
+  getShipmentStatus = async (req: Request, res: Response) => {
+    const { shipmentId } = req.params;
+    try {
+      const shipment = await this.httpClient.get<any>(`/shipments/${shipmentId}`);
+
+      const status = shipment.status;
+      const substatus = shipment.substatus;
+      const readyForInvoice = status === 'ready_to_ship' && substatus === 'invoice_pending';
+
+      res.status(200).json({
+        success: true,
+        data: {
+          shipmentId: Number(shipmentId),
+          status,
+          substatus,
+          invoiceRequired: shipment.invoice_required ?? null,
+          readyForInvoice,
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  };
 }
