@@ -189,9 +189,9 @@ export class MercadoLivreController {
         url += `&status=${String(status)}`;
       }
       const searchResult = await this.httpClient.get<any>(url);
-      const orderIds: number[] = searchResult.results || [];
+      const orders: any[] = searchResult.results || [];
 
-      if (orderIds.length === 0) {
+      if (orders.length === 0) {
         res.status(200).json({
           success: true,
           data: { results: [], paging: searchResult.paging },
@@ -199,13 +199,13 @@ export class MercadoLivreController {
         return;
       }
 
-      // Buscar detalhes completos de cada pedido (com dados do comprador)
+      // Buscar detalhes completos de cada pedido para obter dados do comprador
       const fullOrders = await Promise.all(
-        orderIds.map(async (id: number) => {
+        orders.map(async (order: any) => {
           try {
-            return await this.httpClient.get<any>(`/orders/${id}`);
+            return await this.httpClient.get<any>(`/orders/${order.id}`);
           } catch {
-            return null;
+            return order; // fallback: retorna o pedido resumido
           }
         }),
       );
@@ -213,7 +213,7 @@ export class MercadoLivreController {
       res.status(200).json({
         success: true,
         data: {
-          results: fullOrders.filter(Boolean),
+          results: fullOrders,
           paging: searchResult.paging,
         },
       });
