@@ -127,12 +127,18 @@ export class MercadoLivreAuthService {
 
     logger.api('Chamando POST /oauth/token com refresh_token');
 
+    const clientSecret = process.env.ML_CLIENT_SECRET;
+    if (!clientSecret) {
+      throw new Error('ML_CLIENT_SECRET não configurado no servidor.');
+    }
+
     try {
       const response = await axios.post<MercadoLivreTokenResponse>(
         `${ML_API_BASE}/oauth/token`,
         new URLSearchParams({
           grant_type: 'refresh_token',
           client_id: appId,
+          client_secret: clientSecret,
           refresh_token: refreshToken,
         }).toString(),
         {
