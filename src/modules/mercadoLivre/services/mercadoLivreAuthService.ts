@@ -127,46 +127,53 @@ export class MercadoLivreAuthService {
 
     logger.api('Chamando POST /oauth/token com refresh_token');
 
-    const response = await axios.post<MercadoLivreTokenResponse>(
-      `${ML_API_BASE}/oauth/token`,
-      new URLSearchParams({
-        grant_type: 'refresh_token',
-        client_id: appId,
-        refresh_token: refreshToken,
-      }).toString(),
-      {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          Accept: 'application/json',
+    try {
+      const response = await axios.post<MercadoLivreTokenResponse>(
+        `${ML_API_BASE}/oauth/token`,
+        new URLSearchParams({
+          grant_type: 'refresh_token',
+          client_id: appId,
+          refresh_token: refreshToken,
+        }).toString(),
+        {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            Accept: 'application/json',
+          },
         },
-      },
-    );
+      );
 
-    const tokenData = response.data;
-    const expiresAt = new Date();
-    expiresAt.setSeconds(expiresAt.getSeconds() + tokenData.expires_in);
+      const tokenData = response.data;
+      const expiresAt = new Date();
+      expiresAt.setSeconds(expiresAt.getSeconds() + tokenData.expires_in);
 
-    logger.success('Token renovado com sucesso', { user_id: tokenData.user_id, expires_in: tokenData.expires_in });
+      logger.success('Token renovado com sucesso', { user_id: tokenData.user_id, expires_in: tokenData.expires_in });
 
-    // Atualizar token existente
-    const existingToken = await this.tokenRepository.findActive();
-    if (existingToken) {
-      logger.database('Atualizando token no banco de dados');
+      // Atualizar token existente
+      const existingToken = await this.tokenRepository.findActive();
+      if (existingToken) {
+        logger.database('Atualizando token no banco de dados');
 
-      await this.tokenRepository.save({
-        user_id_ml: existingToken.user_id_ml,
-        access_token: tokenData.access_token,
-        refresh_token: tokenData.refresh_token,
-        expires_at: expiresAt,
-        scope: tokenData.scope,
-        token_type: tokenData.token_type,
-        app_id: existingToken.app_id,
-        nickname: existingToken.nickname || undefined,
-      });
+        await this.tokenRepository.save({
+          user_id_ml: existingToken.user_id_ml,
+          access_token: tokenData.access_token,
+          refresh_token: tokenData.refresh_token,
+          expires_at: expiresAt,
+          scope: tokenData.scope,
+          token_type: tokenData.token_type,
+          app_id: existingToken.app_id,
+          nickname: existingToken.nickname || undefined,
+        });
+      }
+
+      logger.success('Token Mercado Livre renovado com sucesso.');
+      return tokenData;
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || error.response?.data?.error || error.message;
+      const errorStatus = error.response?.status;
+      logger.error(`Falha ao renovar token Mercado Livre [${errorStatus}]: ${errorMsg}`);
+      throw new Error(`Falha ao renovar token ML: ${errorMsg}`);
     }
-
-    logger.success('Token Mercado Livre renovado com sucesso.');
-    return tokenData;
   }
 
   /**

@@ -25,8 +25,13 @@ export class MercadoLivreHttpClient {
 
     if (timeUntilExpiry < 5 * 60 * 1000) {
       logger.auth('Token Mercado Livre expirado ou prestes a expirar. Renovando...');
-      const refreshed = await this.authService.refreshAccessToken(token.refresh_token, token.app_id);
-      return refreshed.access_token;
+      try {
+        const refreshed = await this.authService.refreshAccessToken(token.refresh_token, token.app_id);
+        return refreshed.access_token;
+      } catch (error: any) {
+        logger.error(`Falha ao renovar token ML: ${error.message}`);
+        throw new Error(`Token ML expirado e renovação falhou: ${error.message}. Faça login novamente.`);
+      }
     }
 
     return token.access_token;
