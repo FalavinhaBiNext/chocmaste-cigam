@@ -26,6 +26,7 @@ export class PedidoModel extends Model {
   public numero_pedido_cigam!: string | null;
   public marketplace!: string | null;
   public status_nfe!: string | null;
+  public shipping_id!: string | null;
   public readonly created_at!: Date;
   public readonly updated_at!: Date;
 }
@@ -129,6 +130,10 @@ PedidoModel.init({
     type: Sequelize.STRING,
     allowNull: true,
     defaultValue: 'pendente'
+  },
+  shipping_id: {
+    type: Sequelize.STRING,
+    allowNull: true
   }
 }, {
   sequelize,

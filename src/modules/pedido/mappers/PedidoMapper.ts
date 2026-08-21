@@ -28,6 +28,7 @@ export class PedidoMapper {
       numero_pedido_cigam: data.numero_pedido_cigam,
       marketplace: data.marketplace,
       status_nfe: data.status_nfe,
+      shipping_id: data.shipping_id,
       created_at: data.created_at,
       updated_at: data.updated_at
     }

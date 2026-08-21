@@ -22,6 +22,7 @@ export interface CreatePedidoDTO {
   numero_pedido_cigam?: string;
   marketplace?: string;
   status_nfe?: string;
+  shipping_id?: string;
 }
 
 export interface ResponsePedidoDTO {
@@ -49,6 +50,7 @@ export interface ResponsePedidoDTO {
   numero_pedido_cigam: string | null;
   marketplace: string | null;
   status_nfe: string | null;
+  shipping_id: string | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -77,4 +79,5 @@ export interface UpdatePedidoDTO {
   numero_pedido_cigam?: string;
   marketplace?: string;
   status_nfe?: string;
+  shipping_id?: string;
 }

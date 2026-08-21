@@ -310,6 +310,17 @@ export class MercadoLivreController {
 
       const shipmentId = String(shipments[0]);
 
+      // Salvar shipping_id no pedido local
+      try {
+        const pedido = await this.pedidoService.findByNumeroLoja(String(orderId));
+        if (pedido && !pedido.shipping_id) {
+          await this.pedidoService.update(pedido.id, { shipping_id: shipmentId });
+          logger.info(`[ML SHIPMENT] shipping_id ${shipmentId} salvo no pedido ${pedido.id}`);
+        }
+      } catch {
+        // Pedido pode não existir na tabela local
+      }
+
       // 2. Consultar status do shipment
       const shipment = await this.httpClient.get<any>(`/shipments/${shipmentId}`);
 

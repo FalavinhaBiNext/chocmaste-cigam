@@ -25,6 +25,7 @@ export const createPedidoSchema = z.object({
   numero_pedido_cigam: z.string().optional(),
   marketplace: z.string().optional(),
   status_nfe: z.string().optional(),
+  shipping_id: z.string().optional(),
 });
 
 export type CreatePedidoInput = z.infer<typeof createPedidoSchema>;
