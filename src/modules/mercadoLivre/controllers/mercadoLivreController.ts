@@ -287,12 +287,19 @@ export class MercadoLivreController {
    */
   getShipmentStatus = async (req: Request, res: Response) => {
     const { orderId } = req.params;
+    logger.info(`[ML SHIPMENT] ===== Iniciando verificação de shipment para pedido #${orderId} =====`);
+
     try {
       // 1. Buscar pedido no ML para obter shipment_id
+      logger.info(`[ML SHIPMENT] Passo 1: Buscando pedido #${orderId} na API do Mercado Livre...`);
       const orderData: any = await this.httpClient.get(`/orders/${orderId}`);
+      logger.info(`[ML SHIPMENT] Pedido #${orderId} recebido do ML. Keys: ${Object.keys(orderData).join(', ')}`);
+
       const shipments = orderData.shipments;
+      logger.info(`[ML SHIPMENT] Campo 'shipments' do pedido: ${JSON.stringify(shipments)}`);
 
       if (!shipments || shipments.length === 0) {
+        logger.warn(`[ML SHIPMENT] Pedido #${orderId} não possui shipments no ML.`);
         res.status(200).json({
           success: true,
           data: {
@@ -309,24 +316,38 @@ export class MercadoLivreController {
       }
 
       const shipmentId = String(shipments[0]);
+      logger.info(`[ML SHIPMENT] Passo 2: Shipment ID encontrado: ${shipmentId}`);
 
       // Salvar shipping_id no pedido local
       try {
+        logger.info(`[ML SHIPMENT] Passo 3: Buscando pedido local por numero_loja = ${orderId}...`);
         const pedido = await this.pedidoService.findByNumeroLoja(String(orderId));
-        if (pedido && !pedido.shipping_id) {
-          await this.pedidoService.update(pedido.id, { shipping_id: shipmentId });
-          logger.info(`[ML SHIPMENT] shipping_id ${shipmentId} salvo no pedido ${pedido.id}`);
+        if (pedido) {
+          logger.info(`[ML SHIPMENT] Pedido local encontrado: ID=${pedido.id}, shipping_id atual=${pedido.shipping_id}`);
+          if (!pedido.shipping_id) {
+            await this.pedidoService.update(pedido.id, { shipping_id: shipmentId });
+            logger.info(`[ML SHIPMENT] shipping_id ${shipmentId} salvo no pedido ${pedido.id}`);
+          } else {
+            logger.info(`[ML SHIPMENT] Pedido já possui shipping_id: ${pedido.shipping_id}. Não sobrescrevendo.`);
+          }
+        } else {
+          logger.warn(`[ML SHIPMENT] Pedido local não encontrado para numero_loja = ${orderId}`);
         }
-      } catch {
-        // Pedido pode não existir na tabela local
+      } catch (pedidoError: any) {
+        logger.error(`[ML SHIPMENT] Erro ao buscar/salvar pedido local: ${pedidoError.message}`);
       }
 
       // 2. Consultar status do shipment
+      logger.info(`[ML SHIPMENT] Passo 4: Consultando status do shipment #${shipmentId} na API do ML...`);
       const shipment = await this.httpClient.get<any>(`/shipments/${shipmentId}`);
+      logger.info(`[ML SHIPMENT] Shipment #${shipmentId} recebido. Status=${shipment.status}, Substatus=${shipment.substatus}`);
+      logger.info(`[ML SHIPMENT] substatus_history: ${JSON.stringify(shipment.substatus_history || [])}`);
 
       const status = shipment.status;
       const substatus = shipment.substatus;
       const readyForInvoice = status === 'ready_to_ship' && substatus === 'invoice_pending';
+
+      logger.info(`[ML SHIPMENT] Passo 5: Resultado final — readyForInvoice=${readyForInvoice}`);
 
       res.status(200).json({
         success: true,
@@ -340,7 +361,10 @@ export class MercadoLivreController {
           substatusHistory: shipment.substatus_history || [],
         },
       });
+
+      logger.info(`[ML SHIPMENT] ===== Verificação de shipment para pedido #${orderId} concluída =====`);
     } catch (error: any) {
+      logger.error(`[ML SHIPMENT] ERRO na verificação de shipment para pedido #${orderId}: ${error.message}`);
       res.status(500).json({
         success: false,
         message: error.message,
