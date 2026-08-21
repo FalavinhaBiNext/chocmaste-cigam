@@ -281,11 +281,36 @@ export class MercadoLivreController {
 
   /**
    * Consulta o status de um shipment para verificar se o envio de XML está liberado.
-   * GET /mercado-livre/shipments/:shipmentId/status
+   * GET /mercado-livre/orders/:orderId/shipment-status
+   *
+   * Busca o pedido no ML para obter o shipment_id, depois consulta o shipment.
    */
   getShipmentStatus = async (req: Request, res: Response) => {
-    const { shipmentId } = req.params;
+    const { orderId } = req.params;
     try {
+      // 1. Buscar pedido no ML para obter shipment_id
+      const orderData: any = await this.httpClient.get(`/orders/${orderId}`);
+      const shipments = orderData.shipments;
+
+      if (!shipments || shipments.length === 0) {
+        res.status(200).json({
+          success: true,
+          data: {
+            orderId: String(orderId),
+            shipmentId: null,
+            status: null,
+            substatus: null,
+            readyForInvoice: false,
+            substatusHistory: [],
+            error: 'Pedido não possui shipments no Mercado Livre.',
+          },
+        });
+        return;
+      }
+
+      const shipmentId = String(shipments[0]);
+
+      // 2. Consultar status do shipment
       const shipment = await this.httpClient.get<any>(`/shipments/${shipmentId}`);
 
       const status = shipment.status;
@@ -295,6 +320,7 @@ export class MercadoLivreController {
       res.status(200).json({
         success: true,
         data: {
+          orderId: String(orderId),
           shipmentId: Number(shipmentId),
           status,
           substatus,

@@ -23,7 +23,7 @@ export function createMercadoLivreRoutes(controller: MercadoLivreController): Ro
   router.get('/orders/:orderId', asyncHandler(controller.getOrder));
 
   // Shipments
-  router.get('/shipments/:shipmentId/status', asyncHandler(controller.getShipmentStatus));
+  router.get('/orders/:orderId/shipment-status', asyncHandler(controller.getShipmentStatus));
 
   return router;
 }
