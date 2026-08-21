@@ -149,6 +149,19 @@ export class WebhookService {
       logger.webhook(`Local de venda extraído das observações: ${localVenda}`);
     }
 
+    // Determinar marketplace com base no id_loja
+    let marketplace = '';
+    if (idLoja === '203347320') {
+      marketplace = 'mercado_livre';
+    } else if (idLoja === '204961504') {
+      marketplace = 'shopee';
+    } else if (localVenda) {
+      marketplace = localVenda;
+    }
+    if (marketplace) {
+      logger.webhook(`Marketplace identificado: ${marketplace}`);
+    }
+
     if (localVenda) {
       const canalLocalVenda = await this.canalVendaRepository.findByLocalVenda(localVenda);
       if (canalLocalVenda?.codigo_conta) {
@@ -190,7 +203,7 @@ export class WebhookService {
         codigo_rastreio: codigoRastreio,
         unidade_negocio: unidadeNegocio,
         data_prevista: data.dataPrevisao || undefined,
-        marketplace: localVenda || '',
+        marketplace: marketplace,
       });
     } catch {
       pedido = await this.pedidoService.create({
@@ -214,7 +227,7 @@ export class WebhookService {
         codigo_rastreio: codigoRastreio,
         unidade_negocio: unidadeNegocio,
         data_prevista: data.dataPrevisao || undefined,
-        marketplace: localVenda || '',
+        marketplace: marketplace,
       });
     }
 
