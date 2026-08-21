@@ -295,11 +295,11 @@ export class MercadoLivreController {
       const orderData: any = await this.httpClient.get(`/orders/${orderId}`);
       logger.info(`[ML SHIPMENT] Pedido #${orderId} recebido do ML. Keys: ${Object.keys(orderData).join(', ')}`);
 
-      const shipments = orderData.shipments;
-      logger.info(`[ML SHIPMENT] Campo 'shipments' do pedido: ${JSON.stringify(shipments)}`);
+      const shipmentId = orderData.shipping?.id ? String(orderData.shipping.id) : null;
+      logger.info(`[ML SHIPMENT] Campo 'shipping' do pedido: ${JSON.stringify(orderData.shipping)}`);
 
-      if (!shipments || shipments.length === 0) {
-        logger.warn(`[ML SHIPMENT] Pedido #${orderId} não possui shipments no ML.`);
+      if (!shipmentId) {
+        logger.warn(`[ML SHIPMENT] Pedido #${orderId} não possui shipping_id no ML.`);
         res.status(200).json({
           success: true,
           data: {
@@ -315,7 +315,6 @@ export class MercadoLivreController {
         return;
       }
 
-      const shipmentId = String(shipments[0]);
       logger.info(`[ML SHIPMENT] Passo 2: Shipment ID encontrado: ${shipmentId}`);
 
       // Salvar shipping_id no pedido local
