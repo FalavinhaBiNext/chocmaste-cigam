@@ -204,10 +204,16 @@ container.registerSingleton(NotasFiscaisCigamController);
 
 import { ShopeeTokenRepository } from '@/modules/shopee/repositories/shopeeTokenRepository';
 import { ShopeeAuthService } from '@/modules/shopee/services/shopeeAuthService';
+import { ShopeeHttpClient } from '@/modules/shopee/services/shopeeHttpClient';
+import { ShopeeOrderService } from '@/modules/shopee/services/shopeeOrderService';
+import { ShopeeFiscalService } from '@/modules/shopee/services/shopeeFiscalService';
 import { ShopeeController } from '@/modules/shopee/controllers/shopeeController';
 
 container.registerSingleton(ShopeeTokenRepository);
 container.registerSingleton(ShopeeAuthService);
+container.registerSingleton(ShopeeHttpClient);
+container.registerSingleton(ShopeeOrderService);
+container.registerSingleton(ShopeeFiscalService);
 container.registerSingleton(ShopeeController);
 
 import { CanalVendaRepository } from '@/modules/canalVenda/repositories/canalVendaRepository';
