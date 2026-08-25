@@ -55,6 +55,16 @@ describe('PedidoRepository', () => {
     expect(result!.nome_cliente).toBe('Maria Souza');
   });
 
+  it('countByStatusNfe aggregates pedidos by status_nfe', async () => {
+    const faturado = await repo.create(createPedidoInput({ id_bling: 'bling-456', numero_loja: 'LOJA-002' }));
+    await repo.update(faturado.id, { status_nfe: 'faturada' });
+
+    const counts = await repo.countByStatusNfe();
+
+    expect(counts.pendente).toBeGreaterThanOrEqual(1);
+    expect(counts.faturada).toBe(1);
+  });
+
   it('should return null for non-existent id on findById', async () => {
     const result = await repo.findById('00000000-0000-0000-0000-000000000000');
     expect(result).toBeNull();

@@ -12,6 +12,9 @@ export class EventModel extends Model {
     public total_pedido!: number;
     public cigam_sincronizado!: boolean;
     public cigam_pedido_id!: string | null;
+    public sync_status!: 'pendente' | 'sincronizado' | 'falha';
+    public error_message!: string | null;
+    public retry_count!: number;
     public readonly created_at!: Date;
     public readonly updated_at!: Date;
 }
@@ -58,6 +61,20 @@ EventModel.init({
       cigam_pedido_id: {
         type: Sequelize.STRING,
         allowNull: true
+      },
+      sync_status: {
+        type: Sequelize.STRING,
+        allowNull: false,
+        defaultValue: 'pendente'
+      },
+      error_message: {
+        type: Sequelize.TEXT,
+        allowNull: true
+      },
+      retry_count: {
+        type: Sequelize.INTEGER,
+        allowNull: false,
+        defaultValue: 0
       }
 }, {
     sequelize,

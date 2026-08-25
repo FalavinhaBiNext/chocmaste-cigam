@@ -3,7 +3,7 @@ import { Request, Response } from 'express';
 import { EventController } from '../controllers/eventController';
 
 function mockReq(o: any = {}): Partial<Request> {
-  return { params: {}, body: {}, ...o };
+  return { params: {}, body: {}, query: {}, ...o };
 }
 function mockRes(): Partial<Response> {
   const r: any = {};
@@ -55,6 +55,21 @@ describe('EventController', () => {
     const res = mockRes() as Response;
     await ctrl.findAll(req, res);
     expect(res.status).toHaveBeenCalledWith(200);
+    expect(svc.findAll).toHaveBeenCalledWith(undefined);
+  });
+
+  it('findAll forwards sync_status=falha to the service', async () => {
+    const req = mockReq({ query: { sync_status: 'falha' } }) as Request;
+    const res = mockRes() as Response;
+    await ctrl.findAll(req, res);
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(svc.findAll).toHaveBeenCalledWith('falha');
+  });
+
+  it('findAll rejects an invalid sync_status', async () => {
+    const req = mockReq({ query: { sync_status: 'invalido' } }) as Request;
+    const res = mockRes() as Response;
+    await expect(ctrl.findAll(req, res)).rejects.toThrow();
   });
 
   it('findById returns 200', async () => {

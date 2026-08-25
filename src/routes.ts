@@ -70,6 +70,15 @@ import { createShopeeRoutes } from './modules/shopee/routes/shopee.routes';
 import { CanalVendaController } from './modules/canalVenda/controllers/canalVendaController';
 import { createCanalVendaRoutes } from './modules/canalVenda/routes/canalVenda.routes';
 
+import { TrayController } from './modules/tray/controllers/trayController';
+import { createTrayRoutes } from './modules/tray/routes/tray.routes';
+
+import { IntegrationController } from './modules/integrations/controllers/integrationController';
+import { createIntegrationsRoutes } from './modules/integrations/routes/integrations.routes';
+
+import { SyncPipelineController } from './modules/syncPipeline/controllers/syncPipelineController';
+import { createSyncPipelineRoutes } from './modules/syncPipeline/routes/syncPipeline.routes';
+
 const routes = Router();
 
 const eventController = container.resolve(EventController);
@@ -101,6 +110,9 @@ const usuarioController = container.resolve(UsuarioController)
 const notasFiscaisCigamController = container.resolve(NotasFiscaisCigamController)
 const shopeeController = container.resolve(ShopeeController)
 const canalVendaController = container.resolve(CanalVendaController)
+const trayController = container.resolve(TrayController)
+const integrationController = container.resolve(IntegrationController)
+const syncPipelineController = container.resolve(SyncPipelineController)
 
 routes.use('/events', createEventRoutes(eventController));
 routes.use('/bling', createBlingRoutes(blingController, blingTokenController));
@@ -129,5 +141,8 @@ routes.use('/shopee', createShopeeRoutes(shopeeController))
 routes.use('/notas-fiscais-cigam', createNotasFiscaisCigamRoutes(notasFiscaisCigamController))
 routes.use('/auth', createAuthRoutes(usuarioController))
 routes.use('/canais-venda', createCanalVendaRoutes(canalVendaController))
+routes.use('/tray', createTrayRoutes(trayController))
+routes.use('/integrations', createIntegrationsRoutes(integrationController))
+routes.use('/sync-pipeline-summary', createSyncPipelineRoutes(syncPipelineController))
 
 export { routes }

@@ -67,6 +67,40 @@ export class EventRepository implements IEventRepository {
         await EventModel.update(data, { where: { id } });
     }
 
+    async updateSyncStatus(id: string, data: {
+        sync_status: 'pendente' | 'sincronizado' | 'falha';
+        error_message?: string | null;
+        retry_count?: number;
+        cigam_sincronizado?: boolean;
+        cigam_pedido_id?: string | null;
+    }): Promise<void> {
+        await EventModel.update(data, { where: { id } });
+    }
+
+    async countBySyncStatus(): Promise<Record<string, number>> {
+        const rows = await EventModel.findAll({
+            attributes: [
+                'sync_status',
+                [EventModel.sequelize!.fn('COUNT', EventModel.sequelize!.col('id')), 'count'],
+            ],
+            group: ['sync_status'],
+            raw: true,
+        }) as unknown as Array<{ sync_status: string; count: string | number }>;
+
+        return rows.reduce((acc, row) => {
+            acc[row.sync_status] = Number(row.count);
+            return acc;
+        }, {} as Record<string, number>);
+    }
+
+    async findBySyncStatus(syncStatus: string): Promise<ResponseEventDTO[]> {
+        const events = await EventModel.findAll({
+            where: { sync_status: syncStatus },
+            order: [['created_at', 'DESC']],
+        });
+        return events.map(EventMapper.eventToDTO);
+    }
+
     async delete(id: string): Promise<void> {
         await EventModel.destroy({ where: { id } });
     }

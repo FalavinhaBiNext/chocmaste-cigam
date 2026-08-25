@@ -37,9 +37,11 @@ export class EventService {
         return event;
     }
 
-    async findAll(): Promise<ResponseEventDTO[]>{
-        logger.info('Searching all events')
-        const events = await this.eventRepository.findAll();
+    async findAll(syncStatus?: 'pendente' | 'sincronizado' | 'falha'): Promise<ResponseEventDTO[]>{
+        logger.info(syncStatus ? `Searching events with sync_status=${syncStatus}` : 'Searching all events')
+        const events = syncStatus
+            ? await this.eventRepository.findBySyncStatus(syncStatus)
+            : await this.eventRepository.findAll();
         logger.success(`${events.length} Events retrevied. `)
         return events
     }
@@ -80,6 +82,37 @@ export class EventService {
     async updateCigamStatus(id: string, cigamSincronizado: boolean, cigamPedidoId?: string | null): Promise<void>{
         await this.eventRepository.update(id, { cigam_sincronizado: cigamSincronizado, cigam_pedido_id: cigamPedidoId })
         logger.success(`Evento ${id} atualizado: cigam_sincronizado=${cigamSincronizado}`)
+    }
+
+    /**
+     * Marca a integração do pedido com o CIGAM como falha, preservando o motivo
+     * do erro e incrementando o contador de tentativas — em vez de só logar.
+     */
+    async markSyncFailure(eventId: string, errorMessage: string): Promise<void>{
+        const event = await this.eventRepository.findById(eventId)
+        const retryCount = (event?.retry_count ?? 0) + 1
+        await this.eventRepository.updateSyncStatus(eventId, {
+            sync_status: 'falha',
+            error_message: errorMessage,
+            retry_count: retryCount,
+        })
+        logger.error(`Evento ${eventId} marcado como falha de sincronização (tentativa ${retryCount}): ${errorMessage}`)
+    }
+
+    /**
+     * Marca a integração do pedido com o CIGAM como concluída, limpando o erro
+     * anterior (se houver) e preservando o retry_count acumulado.
+     */
+    async markSyncSuccess(eventId: string, cigamPedidoId?: string | null): Promise<void>{
+        const event = await this.eventRepository.findById(eventId)
+        await this.eventRepository.updateSyncStatus(eventId, {
+            sync_status: 'sincronizado',
+            error_message: null,
+            retry_count: event?.retry_count ?? 0,
+            cigam_sincronizado: true,
+            cigam_pedido_id: cigamPedidoId ?? null,
+        })
+        logger.success(`Evento ${eventId} marcado como sincronizado com o CIGAM`)
     }
 
     async delete(id: string): Promise<void>{

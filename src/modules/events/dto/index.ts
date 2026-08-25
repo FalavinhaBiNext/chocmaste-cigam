@@ -9,6 +9,8 @@ export interface CreateEventDTO {
     total_pedido: number;
 }
 
+export type SyncStatus = 'pendente' | 'sincronizado' | 'falha';
+
 export interface ResponseEventDTO {
     id: string;
     event: string;
@@ -20,6 +22,9 @@ export interface ResponseEventDTO {
     total_pedido: number;
     cigam_sincronizado: boolean;
     cigam_pedido_id: string | null;
+    sync_status: SyncStatus;
+    error_message: string | null;
+    retry_count: number;
     created_at: Date
 }
 
@@ -33,4 +38,7 @@ export interface UpdateEventDTO {
     total_pedido?: number;
     cigam_sincronizado?: boolean;
     cigam_pedido_id?: string | null;
+    sync_status?: SyncStatus;
+    error_message?: string | null;
+    retry_count?: number;
 }

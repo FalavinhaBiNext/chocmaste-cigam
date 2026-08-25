@@ -224,4 +224,26 @@ container.registerSingleton(CanalVendaRepository);
 container.registerSingleton(CanalVendaService);
 container.registerSingleton(CanalVendaController);
 
+import { TrayTokenRepository } from '@/modules/tray/repositories/trayTokenRepository';
+import { TrayAuthService } from '@/modules/tray/services/trayAuthService';
+import { TrayHttpClient } from '@/modules/tray/services/trayHttpClient';
+import { TrayController } from '@/modules/tray/controllers/trayController';
+
+container.registerSingleton(TrayTokenRepository);
+container.registerSingleton(TrayAuthService);
+container.registerSingleton(TrayHttpClient);
+container.registerSingleton(TrayController);
+
+import { IntegrationHealthService } from '@/modules/integrations/services/integrationHealthService';
+import { IntegrationController } from '@/modules/integrations/controllers/integrationController';
+
+container.registerSingleton(IntegrationHealthService);
+container.registerSingleton(IntegrationController);
+
+import { SyncPipelineSummaryService } from '@/modules/syncPipeline/services/syncPipelineSummaryService';
+import { SyncPipelineController } from '@/modules/syncPipeline/controllers/syncPipelineController';
+
+container.registerSingleton(SyncPipelineSummaryService);
+container.registerSingleton(SyncPipelineController);
+
 export { container };

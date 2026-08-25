@@ -65,6 +65,14 @@ export class NotasFiscaisCigamRepository {
     );
   }
 
+  async countByEnviadoMarketplace(): Promise<{ enviado: number; pendente: number }> {
+    const [enviado, pendente] = await Promise.all([
+      NotasFiscaisCigamModel.count({ where: { enviado_marketplace: true } }),
+      NotasFiscaisCigamModel.count({ where: { enviado_marketplace: false } }),
+    ]);
+    return { enviado, pendente };
+  }
+
   private toDTO(model: NotasFiscaisCigamModel): ResponseNotaFiscalCigamDTO {
     const data = model.get({ plain: true });
     return {

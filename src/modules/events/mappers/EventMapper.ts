@@ -14,6 +14,9 @@ export class EventMapper {
             total_pedido: eventModel.total_pedido,
             cigam_sincronizado: eventModel.cigam_sincronizado ?? false,
             cigam_pedido_id: eventModel.cigam_pedido_id ?? null,
+            sync_status: eventModel.sync_status ?? 'pendente',
+            error_message: eventModel.error_message ?? null,
+            retry_count: eventModel.retry_count ?? 0,
             created_at: eventModel.created_at
         }
     }

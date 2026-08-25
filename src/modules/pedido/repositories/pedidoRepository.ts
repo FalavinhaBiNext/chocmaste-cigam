@@ -115,4 +115,20 @@ export class PedidoRepository implements IPedidoRepository {
       where: { id }
     });
   }
+
+  async countByStatusNfe(): Promise<Record<string, number>> {
+    const rows = await PedidoModel.findAll({
+      attributes: [
+        'status_nfe',
+        [PedidoModel.sequelize!.fn('COUNT', PedidoModel.sequelize!.col('id')), 'count'],
+      ],
+      group: ['status_nfe'],
+      raw: true,
+    }) as unknown as Array<{ status_nfe: string | null; count: string | number }>;
+
+    return rows.reduce((acc, row) => {
+      acc[row.status_nfe ?? 'pendente'] = Number(row.count);
+      return acc;
+    }, {} as Record<string, number>);
+  }
 }

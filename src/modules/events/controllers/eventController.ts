@@ -1,6 +1,6 @@
 import { inject, injectable } from 'tsyringe';
 import { Request, Response } from "express";
-import { validateWebhookEvent } from "../events.validator";
+import { validateWebhookEvent, validateListEventsQuery } from "../events.validator";
 import { EventService } from "../services/eventService";
 import { WebhookService } from "../../bling/services/webhookService";
 import { BlingHttpClient } from "../../bling/services/blingHttpClient";
@@ -44,7 +44,8 @@ export class EventController {
     }
 
     findAll = async (req: Request, res: Response) => {
-        const events = await this.eventService.findAll()
+        const query = validateListEventsQuery(req.query)
+        const events = await this.eventService.findAll(query.sync_status)
 
         res.status(200).json({
             success: true,
@@ -121,19 +122,24 @@ export class EventController {
         const pedidoCompleto = await this.blingHttpClient.getPedido(event.pedido_id)
         const data: any = pedidoCompleto.data
 
-        const cigamPedidoId = await this.cigamPedidoService.enviarPedido(data, unidadeNegocio)
+        try {
+            const cigamPedidoId = await this.cigamPedidoService.enviarPedido(data, unidadeNegocio)
 
-        await this.eventService.updateCigamStatus(event.id, true, cigamPedidoId)
+            await this.eventService.markSyncSuccess(event.id, cigamPedidoId)
 
-        logger.success(`Retry CIGAM concluído para evento ${id}, código CIGAM: ${cigamPedidoId}`)
+            logger.success(`Retry CIGAM concluído para evento ${id}, código CIGAM: ${cigamPedidoId}`)
 
-        res.status(200).json({
-            success: true,
-            message: 'Pedido sincronizado com o CIGAM com sucesso.',
-            data: {
-                cigamPedidoId
-            }
-        })
+            res.status(200).json({
+                success: true,
+                message: 'Pedido sincronizado com o CIGAM com sucesso.',
+                data: {
+                    cigamPedidoId
+                }
+            })
+        } catch (cigamError: any) {
+            await this.eventService.markSyncFailure(event.id, cigamError.message)
+            throw cigamError
+        }
     }
 
     delete = async (req: Request, res: Response) => {

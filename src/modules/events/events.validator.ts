@@ -35,6 +35,12 @@ export const webhookEventSchema = z.object({
 
 export type WebhookEventInput = z.infer<typeof webhookEventSchema>;
 
+export const listEventsQuerySchema = z.object({
+  sync_status: z.enum(['pendente', 'sincronizado', 'falha']).optional(),
+});
+
+export type ListEventsQuery = z.infer<typeof listEventsQuerySchema>;
+
 export function validateCreateEvent(input: unknown) {
   const result = createEventSchema.safeParse(input);
 
@@ -50,6 +56,16 @@ export function validateWebhookEvent(input: unknown) {
 
   if (!result.success) {
     throw new ValidationError('Dados inválidos.', result.error.flatten());
+  }
+
+  return result.data;
+}
+
+export function validateListEventsQuery(input: unknown) {
+  const result = listEventsQuerySchema.safeParse(input);
+
+  if (!result.success) {
+    throw new ValidationError('Parâmetros de consulta inválidos.', result.error.flatten());
   }
 
   return result.data;
