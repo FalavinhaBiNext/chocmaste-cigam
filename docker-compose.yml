@@ -1,6 +1,7 @@
 services:
   app:
     build:
+      image: chocmaster-backend:miranda
       context: .
       dockerfile: Dockerfile
     restart: unless-stopped
