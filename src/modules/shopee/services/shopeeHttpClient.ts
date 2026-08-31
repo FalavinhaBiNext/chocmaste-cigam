@@ -4,8 +4,7 @@ import crypto from 'crypto';
 import { ShopeeTokenRepository } from '../repositories/shopeeTokenRepository';
 import { ShopeeAuthService } from './shopeeAuthService';
 import { logger } from '@/shared/utils/logger';
-
-const SHOPEE_API_BASE = 'https://partner.shopeemobile.com/api/v2';
+import { getShopeeApiBase } from '../config/shopeeEnv';
 
 @injectable()
 export class ShopeeHttpClient {
@@ -94,7 +93,7 @@ export class ShopeeHttpClient {
     };
 
     try {
-      const response = await axios.get<T>(`${SHOPEE_API_BASE}${path}`, { params });
+      const response = await axios.get<T>(`${getShopeeApiBase()}${path}`, { params });
       return response.data;
     } catch (error: any) {
       const errorMsg = error.response?.data?.message || error.message;
@@ -118,7 +117,7 @@ export class ShopeeHttpClient {
     };
 
     try {
-      const response = await axios.post<T>(`${SHOPEE_API_BASE}${path}`, body, { params });
+      const response = await axios.post<T>(`${getShopeeApiBase()}${path}`, body, { params });
       return response.data;
     } catch (error: any) {
       const errorMsg = error.response?.data?.message || error.message;

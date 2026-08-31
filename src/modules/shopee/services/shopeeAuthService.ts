@@ -4,11 +4,7 @@ import crypto from 'crypto';
 import { ShopeeTokenRepository } from '../repositories/shopeeTokenRepository';
 import { ShopeeTokenResponse, ShopeeShopInfo } from '../dto';
 import { logger } from '@/shared/utils/logger';
-
-const SHOPEE_AUTH_URL = 'https://partner.shopeemobile.com/api/v2/shop/auth_partner';
-const SHOPEE_TOKEN_URL = 'https://partner.shopeemobile.com/api/v2/auth/token/get';
-const SHOPEE_REFRESH_URL = 'https://partner.shopeemobile.com/api/v2/auth/access_token/get';
-const SHOPEE_API_BASE = 'https://partner.shopeemobile.com/api/v2';
+import { getShopeeApiBase, getShopeeAuthPartnerUrl, getShopeeTokenUrl, getShopeeRefreshUrl } from '../config/shopeeEnv';
 
 @injectable()
 export class ShopeeAuthService {
@@ -34,7 +30,7 @@ export class ShopeeAuthService {
       params.append('state', state);
     }
 
-    return `${SHOPEE_AUTH_URL}?${params.toString()}`;
+    return `${getShopeeAuthPartnerUrl()}?${params.toString()}`;
   }
 
   /**
@@ -66,7 +62,7 @@ export class ShopeeAuthService {
     const sign = this.generateSign(partnerKey, partnerId, timestamp, path);
 
     const response = await axios.post<ShopeeTokenResponse>(
-      `${SHOPEE_TOKEN_URL}`,
+      getShopeeTokenUrl(),
       {
         code,
         shop_id: parseInt(shopId),
@@ -135,7 +131,7 @@ export class ShopeeAuthService {
     const sign = this.generateSign(partnerKey, partnerId, timestamp, path);
 
     const response = await axios.post<ShopeeTokenResponse>(
-      `${SHOPEE_REFRESH_URL}`,
+      getShopeeRefreshUrl(),
       {
         refresh_token: refreshToken,
         shop_id: parseInt(shopId),
@@ -182,7 +178,7 @@ export class ShopeeAuthService {
     const sign = this.generateSign(partnerKey, partnerId, timestamp, path);
 
     const response = await axios.get<ShopeeShopInfo>(
-      `${SHOPEE_API_BASE}/shop/get_shop_info`,
+      `${getShopeeApiBase()}/shop/get_shop_info`,
       {
         params: {
           partner_id: partnerId,
