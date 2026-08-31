@@ -16,14 +16,16 @@ export class ShopeeAuthService {
    * Gera a URL de autorização para redirecionar o usuário.
    * O fluxo OAuth2 da Shopee é: Authorization Code Grant (Server Side)
    */
-  generateAuthURL(partnerId: string, redirectUri: string, state?: string): string {
+  generateAuthURL(partnerId: string, partnerKey: string, redirectUri: string, state?: string): string {
     const timestamp = Math.floor(Date.now() / 1000);
-    const baseString = `${partnerId}${timestamp}`;
-    
+    const path = '/api/v2/shop/auth_partner';
+    const sign = this.generateSign(partnerKey, partnerId, timestamp, path);
+
     const params = new URLSearchParams({
       partner_id: partnerId,
       redirect: redirectUri,
       timestamp: timestamp.toString(),
+      sign,
     });
 
     if (state) {
@@ -196,7 +198,7 @@ export class ShopeeAuthService {
   /**
    * Obtém a URL de autorização para uma nova loja.
    */
-  getAuthUrlForNewShop(partnerId: string, redirectUri: string): string {
-    return this.generateAuthURL(partnerId, redirectUri);
+  getAuthUrlForNewShop(partnerId: string, partnerKey: string, redirectUri: string): string {
+    return this.generateAuthURL(partnerId, partnerKey, redirectUri);
   }
 }

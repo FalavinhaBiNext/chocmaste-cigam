@@ -26,18 +26,19 @@ export class ShopeeController {
    */
   getAuthUrl = async (_req: Request, res: Response): Promise<void> => {
     const partnerId = process.env.SHOPEE_PARTNER_ID;
+    const partnerKey = process.env.SHOPEE_PARTNER_KEY;
     const redirectUri = process.env.SHOPEE_REDIRECT_URI;
 
-    if (!partnerId || !redirectUri) {
+    if (!partnerId || !partnerKey || !redirectUri) {
       res.status(500).json({
         success: false,
-        message: 'SHOPEE_PARTNER_ID e SHOPEE_REDIRECT_URI não configurados no servidor.',
+        message: 'SHOPEE_PARTNER_ID, SHOPEE_PARTNER_KEY e SHOPEE_REDIRECT_URI não configurados no servidor.',
       });
       return;
     }
 
     const state = Math.random().toString(36).substring(2, 15);
-    const authUrl = this.authService.generateAuthURL(partnerId, redirectUri, state);
+    const authUrl = this.authService.generateAuthURL(partnerId, partnerKey, redirectUri, state);
 
     res.status(200).json({
       success: true,
