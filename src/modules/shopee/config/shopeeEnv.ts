@@ -1,5 +1,10 @@
-const SHOPEE_LIVE_HOST = 'https://partner.shopeemobile.com';
-const SHOPEE_TEST_HOST = 'https://partner.test-stable.shopeemobile.com';
+// A Shopee Open Console para o Brasil usa o gateway regional openplatform.shopee.com.br
+// (não o partner.shopeemobile.com global). O partner_id/partner_key é validado contra o
+// gateway específico do ambiente, então usar o host errado gera "Wrong sign" mesmo com o
+// HMAC calculado corretamente. O sandbox correspondente não tem host próprio para o BR —
+// usa o sandbox global.
+const SHOPEE_LIVE_HOST = 'https://openplatform.shopee.com.br';
+const SHOPEE_TEST_HOST = 'https://openplatform.sandbox.test-stable.shopee.sg';
 
 /**
  * A Shopee usa hosts diferentes para o app em modo "Developing" (Test Partner_id/Key,
