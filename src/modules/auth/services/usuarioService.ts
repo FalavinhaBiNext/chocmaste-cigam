@@ -23,6 +23,7 @@ export class UsuarioService {
             nome: data.nome,
             email: data.email,
             senha: hash,
+            role: data.role,
         });
     }
 
@@ -58,5 +59,9 @@ export class UsuarioService {
             throw new IntegrationError('Usuário não encontrado.');
         }
         return user;
+    }
+
+    async listAll(): Promise<ResponseUsuarioDTO[]> {
+        return this.usuarioRepository.findAll();
     }
 }

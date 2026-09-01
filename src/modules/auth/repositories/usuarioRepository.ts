@@ -29,4 +29,9 @@ export class UsuarioRepository implements IUsuarioRepository {
         if (!user) return null;
         return UsuarioMapper.toDTO(user);
     }
+
+    async findAll(): Promise<ResponseUsuarioDTO[]> {
+        const users = await UsuarioModel.findAll({ order: [['created_at', 'DESC']] });
+        return users.map(UsuarioMapper.toDTO);
+    }
 }

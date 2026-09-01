@@ -9,6 +9,7 @@ export function createAuthRoutes(controller: UsuarioController): Router {
     router.post('/register', asyncHandler(controller.register));
     router.post('/login', asyncHandler(controller.login));
     router.get('/me', ensureAuthenticated, asyncHandler(controller.me));
+    router.get('/users', ensureAuthenticated, asyncHandler(controller.list));
 
     return router;
 }

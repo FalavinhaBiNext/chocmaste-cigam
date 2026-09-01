@@ -37,4 +37,12 @@ export class UsuarioController {
             data: user
         });
     }
+
+    list = async (_req: Request, res: Response) => {
+        const users = await this.usuarioService.listAll();
+        res.status(200).json({
+            success: true,
+            data: users
+        });
+    }
 }
