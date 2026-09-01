@@ -295,6 +295,30 @@ export class ShopeeController {
   }
 
   /**
+   * Consulta o histórico (timeline) de rastreio de um pedido.
+   * GET /shopee/orders/:orderSn/tracking-history
+   */
+  getTrackingHistory = async (req: Request, res: Response): Promise<void> => {
+    const orderSn = String(req.params.orderSn);
+    const packageNumber = req.query.package_number ? String(req.query.package_number) : undefined;
+
+    try {
+      const history = await this.orderService.buscarHistoricoRastreio(orderSn, packageNumber);
+
+      res.status(200).json({
+        success: true,
+        data: history,
+      });
+    } catch (error: any) {
+      logger.error(`[SHOPEE TRACKING] Erro ao buscar histórico do pedido ${orderSn}: ${error.message}`);
+      res.status(500).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+
+  /**
    * Envia XML da NF-e para a Shopee.
    * POST /shopee/orders/:orderSn/send-invoice
    */
@@ -309,6 +333,25 @@ export class ShopeeController {
         res.status(404).json({
           success: false,
           message: `Nenhuma NF-e pendente encontrada para o pedido Shopee #${orderSn}.`,
+        });
+        return;
+      }
+
+      // Verificar na Shopee se o pedido está aguardando nota fiscal antes de enviar
+      const orders = await this.orderService.buscarDetalhesPedido([orderSn]);
+      if (orders.length === 0) {
+        res.status(404).json({
+          success: false,
+          message: `Pedido ${orderSn} não encontrado na Shopee.`,
+        });
+        return;
+      }
+
+      const orderStatus = orders[0].order_status;
+      if (orderStatus !== 'INVOICE_PENDING') {
+        res.status(400).json({
+          success: false,
+          message: `Pedido #${orderSn} está com status ${orderStatus} — ainda não está aguardando nota fiscal (INVOICE_PENDING).`,
         });
         return;
       }

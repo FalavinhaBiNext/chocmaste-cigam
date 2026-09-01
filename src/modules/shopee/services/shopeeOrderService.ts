@@ -60,6 +60,18 @@ export interface ShopeeShipmentStatus {
   };
 }
 
+export interface ShopeeTrackingEvent {
+  logistics_status: string;
+  description: string;
+  updateTime: string;
+}
+
+export interface ShopeeTrackingHistory {
+  order_sn: string;
+  logistics_status: string;
+  events: ShopeeTrackingEvent[];
+}
+
 @injectable()
 export class ShopeeOrderService {
   constructor(
@@ -72,10 +84,12 @@ export class ShopeeOrderService {
     pageSize: number = 50,
     cursor?: string,
     orderStatus?: string,
+    timeRangeField: 'create_time' | 'update_time' = 'create_time',
   ): Promise<{ orders: ShopeeOrderListItem[]; more: boolean; nextCursor: string }> {
     logger.info(`[SHOPEE] Listando pedidos de ${new Date(timeFrom * 1000).toISOString()} até ${new Date(timeTo * 1000).toISOString()}`);
 
     const params: Record<string, any> = {
+      time_range_field: timeRangeField,
       time_from: timeFrom,
       time_to: timeTo,
       page_size: pageSize,
@@ -118,7 +132,7 @@ export class ShopeeOrderService {
   async buscarStatusEnvio(orderSn: string): Promise<ShopeeShipmentStatus> {
     logger.info(`[SHOPEE] Buscando status de envio do pedido ${orderSn}`);
 
-    const response = await this.httpClient.get<any>('/logistic/get_shipping_parameter', {
+    const response = await this.httpClient.get<any>('/logistics/get_shipping_parameter', {
       order_sn: orderSn,
     });
 
@@ -143,7 +157,7 @@ export class ShopeeOrderService {
   async buscarNumeroRastreio(orderSn: string): Promise<{ trackingNumber: string; shippingCarrier: string }> {
     logger.info(`[SHOPEE] Buscando número de rastreio do pedido ${orderSn}`);
 
-    const response = await this.httpClient.get<any>('/logistic/get_tracking_number', {
+    const response = await this.httpClient.get<any>('/logistics/get_tracking_number', {
       order_sn: orderSn,
     });
 
@@ -154,6 +168,33 @@ export class ShopeeOrderService {
     return {
       trackingNumber: response.tracking_number || '',
       shippingCarrier: response.shipping_carrier || '',
+    };
+  }
+
+  async buscarHistoricoRastreio(orderSn: string, packageNumber?: string): Promise<ShopeeTrackingHistory> {
+    logger.info(`[SHOPEE] Buscando histórico de rastreio do pedido ${orderSn}`);
+
+    const params: Record<string, any> = { order_sn: orderSn };
+    if (packageNumber) {
+      params.package_number = packageNumber;
+    }
+
+    const response = await this.httpClient.get<any>('/logistics/get_tracking_info', params);
+
+    if (response.error) {
+      throw new Error(`Erro Shopee: ${response.message || response.error}`);
+    }
+
+    const events: ShopeeTrackingEvent[] = (response.tracking_info || []).map((event: any) => ({
+      logistics_status: event.logistics_status,
+      description: event.description,
+      updateTime: new Date(event.update_time * 1000).toISOString(),
+    }));
+
+    return {
+      order_sn: response.order_sn || orderSn,
+      logistics_status: response.logistics_status,
+      events,
     };
   }
 }

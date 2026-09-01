@@ -24,10 +24,9 @@ export class ShopeeFiscalService {
       // Converter XML para base64
       const xmlBase64 = Buffer.from(xmlContent).toString('base64');
 
-      const response = await this.httpClient.post<any>('/payment/upload_document', {
+      const response = await this.httpClient.post<any>('/order/upload_invoice_doc', {
         order_sn: orderSn,
-        document_type: 'INVOICE',
-        document: xmlBase64,
+        invoice_file: xmlBase64,
       });
 
       if (response.error) {
