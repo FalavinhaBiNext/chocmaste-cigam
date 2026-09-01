@@ -2,6 +2,7 @@ import { injectable, inject } from 'tsyringe';
 import { Request, Response } from "express";
 import { UsuarioService } from '../services/usuarioService';
 import { validateRegister, validateLogin } from '../usuario.validator';
+import { ForbiddenError } from '@/shared/errors/AppError';
 
 @injectable()
 export class UsuarioController {
@@ -43,6 +44,23 @@ export class UsuarioController {
         res.status(200).json({
             success: true,
             data: users
+        });
+    }
+
+    alterAtivo = async (req: Request, res: Response) => {
+        const id = String(req.params.id);
+        const requestingUserId = (req as any).user.id;
+
+        if (id === requestingUserId) {
+            throw new ForbiddenError('Você não pode ativar ou desativar seu próprio usuário.');
+        }
+
+        const usuario = await this.usuarioService.toggleAtivo(id);
+
+        res.status(200).json({
+            success: true,
+            message: `Usuário ${usuario.ativo ? 'ativado' : 'desativado'} com sucesso.`,
+            data: usuario
         });
     }
 }

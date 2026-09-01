@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import { UsuarioRepository } from '../repositories/usuarioRepository';
 import { CreateUsuarioDTO, ResponseUsuarioDTO } from '../dto';
 import { RegisterInput, LoginInput } from '../usuario.validator';
-import { IntegrationError, UnauthorizedError, ConflictError } from '@/shared/errors/AppError';
+import { IntegrationError, UnauthorizedError, ConflictError, NotFoundError } from '@/shared/errors/AppError';
 
 @injectable()
 export class UsuarioService {
@@ -63,5 +63,17 @@ export class UsuarioService {
 
     async listAll(): Promise<ResponseUsuarioDTO[]> {
         return this.usuarioRepository.findAll();
+    }
+
+    async toggleAtivo(id: string): Promise<ResponseUsuarioDTO> {
+        const usuario = await this.usuarioRepository.findById(id);
+        if (!usuario) {
+            throw new NotFoundError('Usuário não encontrado.');
+        }
+
+        const novoStatusAtivo = !usuario.ativo;
+        await this.usuarioRepository.updateAtivo(id, novoStatusAtivo);
+
+        return { ...usuario, ativo: novoStatusAtivo };
     }
 }

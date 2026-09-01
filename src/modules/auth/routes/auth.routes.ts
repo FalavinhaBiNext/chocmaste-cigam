@@ -10,6 +10,7 @@ export function createAuthRoutes(controller: UsuarioController): Router {
     router.post('/login', asyncHandler(controller.login));
     router.get('/me', ensureAuthenticated, asyncHandler(controller.me));
     router.get('/users', ensureAuthenticated, asyncHandler(controller.list));
+    router.patch('/users/:id/alter-ativo', ensureAuthenticated, asyncHandler(controller.alterAtivo));
 
     return router;
 }

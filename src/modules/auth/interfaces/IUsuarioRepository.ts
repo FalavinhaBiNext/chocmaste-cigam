@@ -5,4 +5,5 @@ export interface IUsuarioRepository {
     findByEmail(email: string): Promise<(ResponseUsuarioDTO & { senha: string }) | null>;
     findById(id: string): Promise<ResponseUsuarioDTO | null>;
     findAll(): Promise<ResponseUsuarioDTO[]>;
+    updateAtivo(id: string, ativo: boolean): Promise<void>;
 }

@@ -34,4 +34,8 @@ export class UsuarioRepository implements IUsuarioRepository {
         const users = await UsuarioModel.findAll({ order: [['created_at', 'DESC']] });
         return users.map(UsuarioMapper.toDTO);
     }
+
+    async updateAtivo(id: string, ativo: boolean): Promise<void> {
+        await UsuarioModel.update({ ativo }, { where: { id } });
+    }
 }
