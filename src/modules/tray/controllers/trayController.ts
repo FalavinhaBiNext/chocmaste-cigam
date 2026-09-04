@@ -3,6 +3,9 @@ import { Request, Response } from 'express';
 import { TrayAuthService } from '../services/trayAuthService';
 import { TrayTokenRepository } from '../repositories/trayTokenRepository';
 import { TrayHttpClient } from '../services/trayHttpClient';
+import { TrayShippingLabelService } from '../services/trayShippingLabelService';
+import { TrayOrderService } from '../services/trayOrderService';
+import { renderShippingLabelHtml } from '../templates/shippingLabelTemplate';
 import { logger } from '@/shared/utils/logger';
 import { ValidationError } from '@/shared/errors/AppError';
 
@@ -12,6 +15,8 @@ export class TrayController {
     @inject(TrayAuthService) private readonly authService: TrayAuthService,
     @inject(TrayTokenRepository) private readonly tokenRepository: TrayTokenRepository,
     @inject(TrayHttpClient) private readonly httpClient: TrayHttpClient,
+    @inject(TrayShippingLabelService) private readonly shippingLabelService: TrayShippingLabelService,
+    @inject(TrayOrderService) private readonly orderService: TrayOrderService,
   ) {}
 
   /**
@@ -153,5 +158,123 @@ export class TrayController {
       success: true,
       data: info,
     });
+  };
+
+  /**
+   * Lista pedidos com paginação e filtros.
+   * GET /tray/orders?status=A%20ENVIAR&page=1&limit=30&sort=id_desc&modified=2026-01-01
+   */
+  listOrders = async (req: Request, res: Response) => {
+    const { status, page, limit, sort, modified } = req.query;
+
+    const result = await this.orderService.listarPedidos({
+      status: status ? String(status) : undefined,
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+      sort: sort ? String(sort) : undefined,
+      modified: modified ? String(modified) : undefined,
+    });
+
+    res.status(200).json({
+      success: true,
+      data: result,
+    });
+  };
+
+  /**
+   * Busca os dados básicos de um pedido.
+   * GET /tray/orders/:orderId
+   */
+  getOrder = async (req: Request, res: Response) => {
+    const orderId = String(req.params.orderId);
+    const order = await this.orderService.buscarPedido(orderId);
+
+    res.status(200).json({
+      success: true,
+      data: order,
+    });
+  };
+
+  /**
+   * Busca os dados completos do pedido (cliente, endereço e itens embutidos).
+   * GET /tray/orders/:orderId/complete
+   */
+  getOrderComplete = async (req: Request, res: Response) => {
+    const orderId = String(req.params.orderId);
+    const order = await this.orderService.buscarPedidoCompleto(orderId);
+
+    res.status(200).json({
+      success: true,
+      data: order,
+    });
+  };
+
+  /**
+   * Cadastra a URL do emissor de etiqueta da loja (uma única URL por loja).
+   * POST /tray/shipping-label/register
+   */
+  registerShippingLabel = async (req: Request, res: Response) => {
+    const configurationUrl = String(req.body?.configurationUrl || process.env.TRAY_LABEL_URL || '');
+    if (!configurationUrl) {
+      throw new ValidationError('Parâmetro configurationUrl é obrigatório (ou configure TRAY_LABEL_URL).');
+    }
+
+    const result = await this.shippingLabelService.registerLabelUrl(configurationUrl);
+
+    res.status(200).json({
+      success: true,
+      message: 'URL do emissor de etiqueta cadastrada na Tray.',
+      data: result,
+    });
+  };
+
+  /**
+   * Vincula (marca) um pedido para impressão de etiqueta.
+   * POST /tray/orders/:orderId/shipping-label
+   */
+  linkOrderShippingLabel = async (req: Request, res: Response) => {
+    const orderId = String(req.params.orderId);
+    const result = await this.shippingLabelService.linkOrderLabel(orderId);
+
+    res.status(200).json({
+      success: true,
+      message: `Pedido ${orderId} vinculado para impressão de etiqueta.`,
+      data: result,
+    });
+  };
+
+  /**
+   * Remove a vinculação de etiqueta de um pedido.
+   * DELETE /tray/orders/:orderId/shipping-label
+   */
+  unlinkOrderShippingLabel = async (req: Request, res: Response) => {
+    const orderId = String(req.params.orderId);
+    const result = await this.shippingLabelService.unlinkOrderLabel(orderId);
+
+    res.status(200).json({
+      success: true,
+      message: `Vínculo de etiqueta removido do pedido ${orderId}.`,
+      data: result,
+    });
+  };
+
+  /**
+   * Página pública renderizada dentro do IFRAME que a Tray abre no admin da loja
+   * quando o lojista clica para gerar a etiqueta de um pedido.
+   * GET /tray/shipping-label/print?id={orderId}&store_id={storeId}
+   */
+  printShippingLabel = async (req: Request, res: Response) => {
+    const orderId = String(req.query.id || req.query.order_id || '');
+    if (!orderId) {
+      res.status(400).send('<p>Parâmetro "id" do pedido não informado.</p>');
+      return;
+    }
+
+    logger.route(`Endpoint GET /tray/shipping-label/print chamado para pedido ${orderId}`);
+
+    const completeOrder = await this.shippingLabelService.getCompleteOrder(orderId);
+    const html = renderShippingLabelHtml(completeOrder);
+
+    res.status(200).set('Content-Type', 'text/html; charset=utf-8').send(html);
   };
 }

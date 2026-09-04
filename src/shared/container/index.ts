@@ -227,11 +227,15 @@ container.registerSingleton(CanalVendaController);
 import { TrayTokenRepository } from '@/modules/tray/repositories/trayTokenRepository';
 import { TrayAuthService } from '@/modules/tray/services/trayAuthService';
 import { TrayHttpClient } from '@/modules/tray/services/trayHttpClient';
+import { TrayShippingLabelService } from '@/modules/tray/services/trayShippingLabelService';
+import { TrayOrderService } from '@/modules/tray/services/trayOrderService';
 import { TrayController } from '@/modules/tray/controllers/trayController';
 
 container.registerSingleton(TrayTokenRepository);
 container.registerSingleton(TrayAuthService);
 container.registerSingleton(TrayHttpClient);
+container.registerSingleton(TrayOrderService);
+container.registerSingleton(TrayShippingLabelService);
 container.registerSingleton(TrayController);
 
 import { IntegrationHealthService } from '@/modules/integrations/services/integrationHealthService';

@@ -13,8 +13,17 @@ export class ShopeeHttpClient {
     @inject(ShopeeAuthService) private readonly authService: ShopeeAuthService,
   ) {}
 
-  private generateSign(partnerKey: string, partnerId: string, timestamp: number, path: string): string {
-    const baseString = `${partnerId}${path}${timestamp}`;
+  private generateSign(
+    partnerKey: string,
+    partnerId: string,
+    timestamp: number,
+    path: string,
+    accessToken: string,
+    shopId: string,
+  ): string {
+    // Endpoints autenticados de loja exigem access_token e shop_id na base string
+    // (diferente dos endpoints públicos de auth, que usam apenas partner_id+path+timestamp).
+    const baseString = `${partnerId}/api/v2${path}${timestamp}${accessToken}${shopId}`;
     return crypto
       .createHmac('sha256', partnerKey)
       .update(baseString)
@@ -81,7 +90,7 @@ export class ShopeeHttpClient {
   async get<T>(path: string, extraParams?: Record<string, any>): Promise<T> {
     const { partnerId, partnerKey, shopId, accessToken } = await this.getAuthParams();
     const timestamp = Math.floor(Date.now() / 1000);
-    const sign = this.generateSign(partnerKey, partnerId, timestamp, path);
+    const sign = this.generateSign(partnerKey, partnerId, timestamp, path, accessToken, shopId);
 
     const params = {
       partner_id: partnerId,
@@ -105,7 +114,7 @@ export class ShopeeHttpClient {
   async post<T>(path: string, body?: any, extraParams?: Record<string, any>): Promise<T> {
     const { partnerId, partnerKey, shopId, accessToken } = await this.getAuthParams();
     const timestamp = Math.floor(Date.now() / 1000);
-    const sign = this.generateSign(partnerKey, partnerId, timestamp, path);
+    const sign = this.generateSign(partnerKey, partnerId, timestamp, path, accessToken, shopId);
 
     const params = {
       partner_id: partnerId,
