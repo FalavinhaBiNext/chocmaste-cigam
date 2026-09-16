@@ -96,4 +96,15 @@ export class NotasFiscaisCigamController {
       message: 'NF-e excluída com sucesso.',
     });
   }
+
+  enviarParaMarketplace = async (req: Request, res: Response): Promise<void> => {
+    const id = String(req.params.id);
+
+    const resultado = await this.notasFiscaisCigamService.enviarParaMarketplace(id);
+
+    res.status(resultado.success ? 200 : 400).json({
+      success: resultado.success,
+      message: resultado.message,
+    });
+  }
 }

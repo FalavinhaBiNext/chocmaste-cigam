@@ -2,6 +2,7 @@ import { injectable, inject } from 'tsyringe';
 import { NotasFiscaisCigamRepository } from '../repositories/notasFiscaisCigamRepository';
 import { PedidoService } from '@/modules/pedido/services/pedidoService';
 import { MercadoLivreFiscalService } from '@/modules/mercadoLivre/services/mercadoLivreFiscalService';
+import { ShopeeFiscalService } from '@/modules/shopee/services/shopeeFiscalService';
 import { ReceberNotaFiscalInput } from '../notasFiscaisCigam.validator';
 import { ResponseNotaFiscalCigamDTO } from '../dto';
 import { logger } from '@/shared/utils/logger';
@@ -16,6 +17,8 @@ export class NotasFiscaisCigamService {
     private readonly pedidoService: PedidoService,
     @inject(MercadoLivreFiscalService)
     private readonly mercadoLivreFiscalService: MercadoLivreFiscalService,
+    @inject(ShopeeFiscalService)
+    private readonly shopeeFiscalService: ShopeeFiscalService,
   ) {}
 
   async receberNotaFiscal(input: ReceberNotaFiscalInput): Promise<ResponseNotaFiscalCigamDTO> {
@@ -128,6 +131,81 @@ export class NotasFiscaisCigamService {
     }
     await this.notasFiscaisCigamRepository.updateEnviadoMarketplace(id, enviado);
     logger.success(`[NF-E CIGAM] Status de envio atualizado com sucesso`);
+  }
+
+  /**
+   * Envia o XML de uma nota já registrada ao marketplace responsável, resolvendo
+   * o pedido/shipment necessário para cada integração:
+   * - Shopee: usa numero_pedido_marketplace (order_sn) diretamente.
+   * - Mercado Livre: busca o pedido local por numero_pedido_cigam para obter o
+   *   shipping_id (com cache — replica a resolução de MercadoLivreController.getShipmentStatus
+   *   quando ainda não há shipping_id salvo).
+   * Usado pelo botão "Enviar XML" da tela de NF-e CIGAM — não é usado pela tela de Pedidos.
+   */
+  async enviarParaMarketplace(id: string): Promise<{ success: boolean; message: string }> {
+    const nota = await this.notasFiscaisCigamRepository.findById(id);
+    if (!nota) {
+      throw new NotFoundError(`Nota fiscal com ID: ${id} não encontrada`);
+    }
+
+    if (nota.enviado_marketplace) {
+      return { success: false, message: 'Esta NF-e já foi enviada ao marketplace.' };
+    }
+
+    if (!nota.marketplace) {
+      return { success: false, message: 'Esta NF-e não está vinculada a um pedido de marketplace.' };
+    }
+
+    let resultado: { success: boolean; error?: string };
+
+    if (nota.marketplace === 'shopee') {
+      if (!nota.numero_pedido_marketplace) {
+        return { success: false, message: 'NF-e sem número de pedido do marketplace vinculado.' };
+      }
+
+      resultado = await this.shopeeFiscalService.enviarNFe(nota.numero_pedido_marketplace, {
+        xmlContent: nota.xml_content,
+        chaveAcesso: nota.chave_acesso,
+        createdAt: nota.created_at,
+      });
+    } else if (nota.marketplace === 'mercado_livre') {
+      const shipmentInfo = await this.mercadoLivreFiscalService.resolverShipmentId(nota.numero_pedido_cigam);
+      if (!shipmentInfo.success || !shipmentInfo.shipmentId) {
+        return {
+          success: false,
+          message: shipmentInfo.error || 'O XML ainda não pode ser enviado ao marketplace. Aguarde o marketplace liberar o envio.',
+        };
+      }
+
+      resultado = await this.mercadoLivreFiscalService.enviarNFePorShipmentId(shipmentInfo.shipmentId, nota.xml_content);
+    } else {
+      return {
+        success: false,
+        message: `Envio automático de XML ainda não é suportado para o marketplace "${nota.marketplace}".`,
+      };
+    }
+
+    if (!resultado.success) {
+      logger.warn(`[NF-E CIGAM] Envio manual da nota ${nota.id} bloqueado: ${resultado.error}`);
+      return {
+        success: false,
+        message: resultado.error || 'O XML ainda não pode ser enviado ao marketplace. Aguarde o marketplace liberar o envio.',
+      };
+    }
+
+    await this.notasFiscaisCigamRepository.updateEnviadoMarketplace(nota.id, true);
+
+    try {
+      const pedidoVinculado = await this.pedidoService.findByNumeroPedidoCigam(nota.numero_pedido_cigam);
+      if (pedidoVinculado) {
+        await this.pedidoService.update(pedidoVinculado.id, { status_nfe: 'enviada' });
+      }
+    } catch (error: any) {
+      logger.error(`[NF-E CIGAM] Erro ao atualizar status_nfe do pedido após envio manual: ${error.message}`);
+    }
+
+    logger.success(`[NF-E CIGAM] NF-e ${nota.id} enviada manualmente com sucesso ao marketplace ${nota.marketplace}.`);
+    return { success: true, message: 'NF-e enviada com sucesso ao marketplace.' };
   }
 
   async deleteById(id: string): Promise<void> {
