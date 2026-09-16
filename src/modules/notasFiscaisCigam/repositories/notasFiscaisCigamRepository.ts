@@ -65,6 +65,10 @@ export class NotasFiscaisCigamRepository {
     );
   }
 
+  async deleteById(id: string): Promise<void> {
+    await NotasFiscaisCigamModel.destroy({ where: { id } });
+  }
+
   async countByEnviadoMarketplace(): Promise<{ enviado: number; pendente: number }> {
     const [enviado, pendente] = await Promise.all([
       NotasFiscaisCigamModel.count({ where: { enviado_marketplace: true } }),

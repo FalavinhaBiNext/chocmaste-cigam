@@ -16,6 +16,7 @@ export function createNotasFiscaisCigamRoutes(
   router.get('/nao-enviadas', asyncHandler(controller.listarNotEnviadas));
   router.get('/:id', asyncHandler(controller.buscarPorId));
   router.patch('/:id/enviar', asyncHandler(controller.marcarEnviada));
+  router.delete('/:id', asyncHandler(controller.excluirNota));
 
   return router;
 }

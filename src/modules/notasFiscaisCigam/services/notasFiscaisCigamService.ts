@@ -129,4 +129,14 @@ export class NotasFiscaisCigamService {
     await this.notasFiscaisCigamRepository.updateEnviadoMarketplace(id, enviado);
     logger.success(`[NF-E CIGAM] Status de envio atualizado com sucesso`);
   }
+
+  async deleteById(id: string): Promise<void> {
+    logger.info(`[NF-E CIGAM] Excluindo nota fiscal ${id}`);
+    const nota = await this.notasFiscaisCigamRepository.findById(id);
+    if (!nota) {
+      throw new NotFoundError(`Nota fiscal com ID: ${id} não encontrada`);
+    }
+    await this.notasFiscaisCigamRepository.deleteById(id);
+    logger.success(`[NF-E CIGAM] Nota fiscal ${id} excluída com sucesso`);
+  }
 }
