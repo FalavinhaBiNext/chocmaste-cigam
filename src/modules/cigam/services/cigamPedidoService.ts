@@ -159,11 +159,67 @@ export class CigamPedidoService {
       await delay(200); // pequeno delay entre itens
     }
 
-    // 8. Aguardar processamento do CIGAM antes de verificar/atualizar
+    // 8. Aguardar processamento inicial do CIGAM antes da primeira verificação
     logger.info('Aguardando 10 segundos para processamento do CIGAM...');
     await delay(10000);
 
-    // 9. Verificar existência do pedido e atualizar frete/desconto (sem autenticação)
+    // 9. Verificar existência do pedido via API comercial (mesma autenticação do Salvar/
+    // SalvarItemPedido, mais confiável que o hub_pedido). BuscarItensPedido retorna []
+    // quando o pedido ainda não foi indexado — não é um erro HTTP, por isso repetimos
+    // a verificação em vez de desistir na primeira lista vazia.
+    const VERIFICACAO_MAX_TENTATIVAS = 5;
+    const VERIFICACAO_INTERVALO_MS = 15000;
+
+    let itensPedidoCigam: any[] = [];
+    let erroVerificacao: any = null;
+
+    for (let tentativa = 1; tentativa <= VERIFICACAO_MAX_TENTATIVAS; tentativa++) {
+      logger.info(`Verificando existência do pedido CIGAM #${codigoPedidoCigam} via BuscarItensPedido (tentativa ${tentativa}/${VERIFICACAO_MAX_TENTATIVAS})...`);
+
+      try {
+        const resp: any = await this.cigamHttpClient.get(
+          baseUrl,
+          ambiente,
+          '/API/api/comercial/fa/Pedido/BuscarItensPedido',
+          { params: { codigoPedido: codigoPedidoCigam } }
+        );
+        itensPedidoCigam = Array.isArray(resp) ? resp : (resp?.data ?? []);
+        erroVerificacao = null;
+
+        if (itensPedidoCigam.length > 0) {
+          break;
+        }
+      } catch (error: any) {
+        erroVerificacao = error;
+      }
+
+      const ehUltimaTentativa = tentativa === VERIFICACAO_MAX_TENTATIVAS;
+      if (ehUltimaTentativa) {
+        // Só loga como erro de verdade depois de esgotar todas as tentativas —
+        // falhas/listas vazias nas tentativas anteriores são esperadas (atraso de indexação).
+        logger.error(
+          `Todas as ${VERIFICACAO_MAX_TENTATIVAS} tentativas de verificar o pedido CIGAM #${codigoPedidoCigam} via BuscarItensPedido falharam. ` +
+          (erroVerificacao ? `Última falha: ${erroVerificacao.message}` : 'BuscarItensPedido retornou lista vazia em todas as tentativas.')
+        );
+      } else {
+        logger.warn(
+          `Tentativa ${tentativa}/${VERIFICACAO_MAX_TENTATIVAS}: pedido CIGAM #${codigoPedidoCigam} ainda não encontrado ` +
+          (erroVerificacao ? `(erro: ${erroVerificacao.message})` : '(BuscarItensPedido retornou [])') +
+          '. Tentando novamente...'
+        );
+        logger.info(`Aguardando ${VERIFICACAO_INTERVALO_MS / 1000}s antes da próxima tentativa...`);
+        await delay(VERIFICACAO_INTERVALO_MS);
+      }
+    }
+
+    if (itensPedidoCigam.length === 0) {
+      const detalhe = erroVerificacao
+        ? `Erro na última tentativa: ${erroVerificacao.message}`
+        : 'BuscarItensPedido retornou lista vazia em todas as tentativas.';
+      throw new Error(`Pedido CIGAM #${codigoPedidoCigam} não encontrado após ${VERIFICACAO_MAX_TENTATIVAS} tentativas. ${detalhe}`);
+    }
+
+    // PATCH de frete/desconto continua no hub_pedido (API separada, com X-Api-Key).
     const urlPedidoCigam = `${baseUrl}/hub_pedido/api/pedidos/${codigoPedidoCigam}`;
 
     const httpsAgent =
@@ -177,30 +233,7 @@ export class CigamPedidoService {
     }
     const headersCigam = { 'X-Api-Key': hubPedidoApiKey };
 
-    logger.info(`Verificando existência do pedido CIGAM #${codigoPedidoCigam}...`);
-    logger.info(`URL da requisição GET: ${urlPedidoCigam}`);
-    let pedidoCigam: any = null;
-    let erroVerificacao: any = null;
-    try {
-      const resp = await axios.get(urlPedidoCigam, { httpsAgent, headers: headersCigam });
-      pedidoCigam = resp.data;
-    } catch (error: any) {
-      erroVerificacao = error;
-      logger.error(
-        `Falha ao verificar pedido CIGAM #${codigoPedidoCigam} em ${urlPedidoCigam}. ` +
-        `Status: ${error.response?.status ?? 'sem resposta (timeout/rede)'}. ` +
-        `Corpo da resposta: ${JSON.stringify(error.response?.data ?? error.message)}`
-      );
-    }
-
-    if (!pedidoCigam) {
-      const detalhe = erroVerificacao
-        ? `Status HTTP ${erroVerificacao.response?.status ?? 'desconhecido'}: ${JSON.stringify(erroVerificacao.response?.data ?? erroVerificacao.message)}`
-        : 'Resposta vazia sem erro HTTP.';
-      throw new Error(`Pedido CIGAM #${codigoPedidoCigam} não encontrado após criação. Detalhe da verificação: ${detalhe}`);
-    }
-
-    logger.success(`Pedido CIGAM #${codigoPedidoCigam} encontrado. Atualizando frete e desconto...`);
+    logger.success(`Pedido CIGAM #${codigoPedidoCigam} encontrado (${itensPedidoCigam.length} item(ns)). Atualizando frete e desconto...`);
     logger.info(`URL da requisição PATCH: ${urlPedidoCigam}`);
     await axios.patch(urlPedidoCigam, {
       valorDesconto: descontoValor,
