@@ -358,7 +358,11 @@ export class ShopeeController {
 
       logger.info(`[SHOPEE INVOICE] Enviando NF-e ${nota.id} para pedido #${orderSn}`);
 
-      const resultado = await this.fiscalService.enviarNFe(orderSn, nota.xml_content);
+      const resultado = await this.fiscalService.enviarNFe(orderSn, {
+        xmlContent: nota.xml_content,
+        chaveAcesso: nota.chave_acesso,
+        createdAt: nota.created_at,
+      });
 
       if (resultado.success) {
         await this.notasFiscaisRepo.updateEnviadoMarketplace(nota.id, true);

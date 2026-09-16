@@ -171,14 +171,33 @@ export class CigamPedidoService {
         ? new https.Agent({ rejectUnauthorized: false })
         : undefined;
 
-    const headersCigam = { 'X-Api-Key': 'eb6f0ff4-0169-4806-b8be-6e524e7f8f869eed5c75aa1e42c983ceacf977a51ced' };
+    const hubPedidoApiKey = process.env.CIGAM_HUB_PEDIDO_API_KEY;
+    if (!hubPedidoApiKey) {
+      throw new Error('CIGAM_HUB_PEDIDO_API_KEY não configurada no servidor.');
+    }
+    const headersCigam = { 'X-Api-Key': hubPedidoApiKey };
 
     logger.info(`Verificando existência do pedido CIGAM #${codigoPedidoCigam}...`);
     logger.info(`URL da requisição GET: ${urlPedidoCigam}`);
-    const pedidoCigam = await axios.get(urlPedidoCigam, { httpsAgent, headers: headersCigam }).then(r => r.data).catch(() => null);
+    let pedidoCigam: any = null;
+    let erroVerificacao: any = null;
+    try {
+      const resp = await axios.get(urlPedidoCigam, { httpsAgent, headers: headersCigam });
+      pedidoCigam = resp.data;
+    } catch (error: any) {
+      erroVerificacao = error;
+      logger.error(
+        `Falha ao verificar pedido CIGAM #${codigoPedidoCigam} em ${urlPedidoCigam}. ` +
+        `Status: ${error.response?.status ?? 'sem resposta (timeout/rede)'}. ` +
+        `Corpo da resposta: ${JSON.stringify(error.response?.data ?? error.message)}`
+      );
+    }
 
     if (!pedidoCigam) {
-      throw new Error(`Pedido CIGAM #${codigoPedidoCigam} não encontrado após criação.`);
+      const detalhe = erroVerificacao
+        ? `Status HTTP ${erroVerificacao.response?.status ?? 'desconhecido'}: ${JSON.stringify(erroVerificacao.response?.data ?? erroVerificacao.message)}`
+        : 'Resposta vazia sem erro HTTP.';
+      throw new Error(`Pedido CIGAM #${codigoPedidoCigam} não encontrado após criação. Detalhe da verificação: ${detalhe}`);
     }
 
     logger.success(`Pedido CIGAM #${codigoPedidoCigam} encontrado. Atualizando frete e desconto...`);

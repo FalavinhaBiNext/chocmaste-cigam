@@ -134,4 +134,33 @@ export class ShopeeHttpClient {
       throw new Error(`Erro na API Shopee [${errorCode}]: ${errorMsg}`);
     }
   }
+
+  /**
+   * POST multipart/form-data (usado por endpoints de upload de arquivo, como
+   * /order/upload_invoice_doc). O axios detecta a FormData nativa do Node e
+   * define o Content-Type com o boundary correto automaticamente.
+   */
+  async postForm<T>(path: string, form: FormData, extraParams?: Record<string, any>): Promise<T> {
+    const { partnerId, partnerKey, shopId, accessToken } = await this.getAuthParams();
+    const timestamp = Math.floor(Date.now() / 1000);
+    const sign = this.generateSign(partnerKey, partnerId, timestamp, path, accessToken, shopId);
+
+    const params = {
+      partner_id: partnerId,
+      timestamp,
+      sign,
+      access_token: accessToken,
+      shop_id: shopId,
+      ...extraParams,
+    };
+
+    try {
+      const response = await axios.post<T>(`${getShopeeApiBase()}${path}`, form, { params });
+      return response.data;
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || error.message;
+      const errorCode = error.response?.data?.error;
+      throw new Error(`Erro na API Shopee [${errorCode}]: ${errorMsg}`);
+    }
+  }
 }
