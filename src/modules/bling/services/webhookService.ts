@@ -202,7 +202,7 @@ export class WebhookService {
         nome_transportadora: transportadoraNome,
         codigo_rastreio: codigoRastreio,
         unidade_negocio: unidadeNegocio,
-        data_prevista: data.dataPrevisao || undefined,
+        data_prevista: data.dataPrevista || undefined,
         marketplace: marketplace,
       });
     } catch {
@@ -226,7 +226,7 @@ export class WebhookService {
         nome_transportadora: transportadoraNome,
         codigo_rastreio: codigoRastreio,
         unidade_negocio: unidadeNegocio,
-        data_prevista: data.dataPrevisao || undefined,
+        data_prevista: data.dataPrevista || undefined,
         marketplace: marketplace,
       });
     }

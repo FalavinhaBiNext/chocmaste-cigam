@@ -50,7 +50,7 @@ export interface BlingPedidoDataDTO {
   numeroLoja: string;
   data: string;
   dataSaida?: string;
-  dataPrevisao?: string;
+  dataPrevista?: string;
   totalProdutos: number;
   total: number;
   desconto?: number;
