@@ -149,11 +149,15 @@ export class WebhookService {
       logger.webhook(`Local de venda extraído das observações: ${localVenda}`);
     }
 
-    // Determinar marketplace com base no id_loja
+    // Determinar marketplace com base no tipo do canal de venda (Bling) — cobre todos os
+    // canais de um mesmo marketplace (ex.: múltiplas contas Shopee), não só um id_loja fixo.
+    // Os ids fixos ficam como fallback, caso o canal ainda não esteja sincronizado em canal_vendas.
+    const tipoCanalNormalizado = (canalVenda?.tipo || '').toLowerCase();
+
     let marketplace = '';
-    if (idLoja === '203347320') {
+    if (idLoja === '203347320' || tipoCanalNormalizado.includes('mercado')) {
       marketplace = 'mercado_livre';
-    } else if (idLoja === '204961504') {
+    } else if (idLoja === '204961504' || tipoCanalNormalizado.includes('shopee')) {
       marketplace = 'shopee';
     } else if (localVenda) {
       marketplace = localVenda;

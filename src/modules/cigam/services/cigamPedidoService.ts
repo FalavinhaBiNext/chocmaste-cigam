@@ -7,6 +7,7 @@ import { CigamTransportadoraService } from './cigamTransportadoraService';
 import { UsuarioCigamService } from '@/modules/usuarioCigam/services/usuarioCigamService';
 import { DeParaFormasPagamentoRepository } from '@/modules/depara/repositories/deparaFormasPagamentoRepository';
 import { DeParaProdutosRepository } from '@/modules/depara/repositories/deparaProdutosRepository';
+import { PedidoService } from '@/modules/pedido/services/pedidoService';
 import { logger } from '@/shared/utils/logger';
 import { delay } from '@/shared/utils/delay';
 
@@ -19,6 +20,7 @@ export class CigamPedidoService {
     @inject(UsuarioCigamService) private readonly usuarioCigamService: UsuarioCigamService,
     @inject(DeParaFormasPagamentoRepository) private readonly deParaFormasPagamentoRepo: DeParaFormasPagamentoRepository,
     @inject(DeParaProdutosRepository) private readonly deParaProdutosRepo: DeParaProdutosRepository,
+    @inject(PedidoService) private readonly pedidoService: PedidoService,
   ) {}
 
   private async getActiveEnv(): Promise<string> {
@@ -136,6 +138,18 @@ export class CigamPedidoService {
     // O CIGAM costuma retornar o código do pedido criado na propriedade 'data.codigoPedido'
     let codigoPedidoCigam = responseCapa?.data?.codigoPedido || responseCapa?.Codigo || responseCapa?.codigo || responseCapa?.id || String(pedidoBling.numero);
     logger.success(`Capa do pedido criada no CIGAM com sucesso. Código do pedido no CIGAM: ${codigoPedidoCigam}`);
+
+    // Salva o numero_pedido_cigam no pedido local imediatamente, antes de qualquer outra
+    // etapa (itens, verificação, frete/desconto). Assim, mesmo que uma etapa seguinte falhe
+    // por instabilidade do CIGAM, o pedido já criado não fica "órfão" no nosso sistema — a
+    // NF-e que chegar depois consegue se vincular por numero_pedido_cigam normalmente.
+    try {
+      const pedidoLocal = await this.pedidoService.findByIdBling(String(pedidoBling.id));
+      await this.pedidoService.update(pedidoLocal.id, { numero_pedido_cigam: codigoPedidoCigam });
+      logger.success(`Código do pedido CIGAM (${codigoPedidoCigam}) salvo no pedido local (${pedidoLocal.id}) logo após a criação da capa.`);
+    } catch (error: any) {
+      logger.error(`Falha ao salvar numero_pedido_cigam no pedido local logo após a criação da capa: ${error.message}`);
+    }
 
     // 7. Enviar os itens do pedido
     for (const item of itensMapeados) {
