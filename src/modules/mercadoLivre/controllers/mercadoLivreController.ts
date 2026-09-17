@@ -4,6 +4,7 @@ import { MercadoLivreAuthService } from '../services/mercadoLivreAuthService';
 import { MercadoLivreTokenRepository } from '../repositories/mercadoLivreTokenRepository';
 import { MercadoLivreHttpClient } from '../services/mercadoLivreHttpClient';
 import { MercadoLivreFiscalService } from '../services/mercadoLivreFiscalService';
+import { MercadoLivreShippingLabelService } from '../services/mercadoLivreShippingLabelService';
 import { NotasFiscaisCigamRepository } from '@/modules/notasFiscaisCigam/repositories/notasFiscaisCigamRepository';
 import { PedidoService } from '@/modules/pedido/services/pedidoService';
 import { logger } from '@/shared/utils/logger';
@@ -15,6 +16,7 @@ export class MercadoLivreController {
     @inject(MercadoLivreTokenRepository) private readonly tokenRepository: MercadoLivreTokenRepository,
     @inject(MercadoLivreHttpClient) private readonly httpClient: MercadoLivreHttpClient,
     @inject(MercadoLivreFiscalService) private readonly fiscalService: MercadoLivreFiscalService,
+    @inject(MercadoLivreShippingLabelService) private readonly shippingLabelService: MercadoLivreShippingLabelService,
     @inject(NotasFiscaisCigamRepository) private readonly notasFiscaisRepo: NotasFiscaisCigamRepository,
     @inject(PedidoService) private readonly pedidoService: PedidoService,
   ) {}
@@ -345,8 +347,10 @@ export class MercadoLivreController {
       const status = shipment.status;
       const substatus = shipment.substatus;
       const readyForInvoice = status === 'ready_to_ship' && substatus === 'invoice_pending';
+      const readyToPrint = status === 'ready_to_ship' && substatus === 'ready_to_print';
+      const logisticType = shipment.logistic?.type ?? shipment.logistic_type ?? null;
 
-      logger.info(`[ML SHIPMENT] Passo 5: Resultado final — readyForInvoice=${readyForInvoice}`);
+      logger.info(`[ML SHIPMENT] Passo 5: Resultado final — readyForInvoice=${readyForInvoice}, readyToPrint=${readyToPrint}, logisticType=${logisticType}`);
 
       res.status(200).json({
         success: true,
@@ -357,6 +361,8 @@ export class MercadoLivreController {
           substatus,
           invoiceRequired: shipment.invoice_required ?? null,
           readyForInvoice,
+          readyToPrint,
+          logisticType,
           substatusHistory: shipment.substatus_history || [],
         },
       });
@@ -422,6 +428,47 @@ export class MercadoLivreController {
       }
     } catch (error: any) {
       logger.error(`[ML INVOICE] Erro ao enviar NF-e: ${error.message}`);
+      res.status(500).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  };
+
+  /**
+   * Baixa a etiqueta de envio (ZIP com PDF + TXT Zebra) de um pedido.
+   * GET /mercado-livre/orders/:orderId/shipping-label
+   */
+  getShippingLabel = async (req: Request, res: Response) => {
+    const { orderId } = req.params;
+    try {
+      const orderData: any = await this.httpClient.get(`/orders/${orderId}`);
+      const shipmentId = orderData.shipping?.id ? String(orderData.shipping.id) : null;
+
+      if (!shipmentId) {
+        res.status(404).json({
+          success: false,
+          message: 'Pedido não possui shipment associado no Mercado Livre.',
+        });
+        return;
+      }
+
+      const resultado = await this.shippingLabelService.obterEtiquetaPorShipmentId(shipmentId);
+
+      if (!resultado.success || !resultado.buffer) {
+        res.status(400).json({
+          success: false,
+          message: resultado.error || 'Não foi possível obter a etiqueta.',
+          errorCode: resultado.errorCode,
+        });
+        return;
+      }
+
+      res.setHeader('Content-Type', resultado.contentType || 'application/zip');
+      res.setHeader('Content-Disposition', `attachment; filename="${resultado.filename}"`);
+      res.status(200).send(resultado.buffer);
+    } catch (error: any) {
+      logger.error(`[ML LABEL] Erro ao obter etiqueta do pedido #${orderId}: ${error.message}`);
       res.status(500).json({
         success: false,
         message: error.message,

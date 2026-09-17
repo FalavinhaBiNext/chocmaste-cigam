@@ -21,6 +21,7 @@ export function createMercadoLivreRoutes(controller: MercadoLivreController): Ro
   router.get('/orders', asyncHandler(controller.listOrders));
   router.post('/orders/:orderId/send-invoice', asyncHandler(controller.sendInvoice));
   router.get('/orders/:orderId/shipment-status', asyncHandler(controller.getShipmentStatus));
+  router.get('/orders/:orderId/shipping-label', asyncHandler(controller.getShippingLabel));
   router.get('/orders/:orderId', asyncHandler(controller.getOrder));
 
   return router;

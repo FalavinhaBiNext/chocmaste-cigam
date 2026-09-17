@@ -187,12 +187,14 @@ import { MercadoLivreAuthService } from '@/modules/mercadoLivre/services/mercado
 import { MercadoLivreHttpClient } from '@/modules/mercadoLivre/services/mercadoLivreHttpClient';
 import { MercadoLivreController } from '@/modules/mercadoLivre/controllers/mercadoLivreController';
 import { MercadoLivreFiscalService } from '@/modules/mercadoLivre/services/mercadoLivreFiscalService';
+import { MercadoLivreShippingLabelService } from '@/modules/mercadoLivre/services/mercadoLivreShippingLabelService';
 
 container.registerSingleton(MercadoLivreTokenRepository);
 container.registerSingleton(MercadoLivreAuthService);
 container.registerSingleton(MercadoLivreHttpClient);
 container.registerSingleton(MercadoLivreController);
 container.registerSingleton(MercadoLivreFiscalService);
+container.registerSingleton(MercadoLivreShippingLabelService);
 
 import { NotasFiscaisCigamRepository } from '@/modules/notasFiscaisCigam/repositories/notasFiscaisCigamRepository';
 import { NotasFiscaisCigamService } from '@/modules/notasFiscaisCigam/services/notasFiscaisCigamService';

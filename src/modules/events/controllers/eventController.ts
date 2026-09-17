@@ -137,7 +137,10 @@ export class EventController {
                 }
             })
         } catch (cigamError: any) {
-            await this.eventService.markSyncFailure(event.id, cigamError.message)
+            const detalheResposta = cigamError.response?.data
+                ? ` | resposta CIGAM: ${JSON.stringify(cigamError.response.data)}`
+                : ''
+            await this.eventService.markSyncFailure(event.id, `${cigamError.message}${detalheResposta}`)
             throw cigamError
         }
     }

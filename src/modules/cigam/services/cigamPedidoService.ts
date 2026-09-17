@@ -249,10 +249,20 @@ export class CigamPedidoService {
 
     logger.success(`Pedido CIGAM #${codigoPedidoCigam} encontrado (${itensPedidoCigam.length} item(ns)). Atualizando frete e desconto...`);
     logger.info(`URL da requisição PATCH: ${urlPedidoCigam}`);
-    await axios.patch(urlPedidoCigam, {
-      valorDesconto: descontoValor,
-      valorFrete: valorFrete,
-    }, { httpsAgent, headers: headersCigam });
+    logger.info(`X-Api-Key utilizada: ${hubPedidoApiKey.slice(0, 4)}...${hubPedidoApiKey.slice(-4)} (mascarada; ver observação abaixo)`);
+    try {
+      await axios.patch(urlPedidoCigam, {
+        valorDesconto: descontoValor,
+        valorFrete: valorFrete,
+      }, { httpsAgent, headers: headersCigam });
+    } catch (error: any) {
+      logger.error(
+        `PATCH de frete/desconto falhou para o pedido CIGAM #${codigoPedidoCigam}: ` +
+        `status=${error.response?.status ?? 'sem status'} ` +
+        `corpo=${JSON.stringify(error.response?.data) ?? 'sem corpo'}`
+      );
+      throw error;
+    }
 
     logger.success(`Pedido Bling #${pedidoBling.numero} integrado ao CIGAM com sucesso!`);
     return codigoPedidoCigam;
