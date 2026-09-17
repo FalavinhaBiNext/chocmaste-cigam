@@ -114,14 +114,25 @@ export class MercadoLivreFiscalService {
    */
   private async verificarEEnviar(shipmentId: string, xmlContent: string): Promise<EnviarNFeResult> {
     let sellerId: string | undefined;
+    let receiverZipCode: string | undefined;
 
     try {
       const shipmentData: any = await this.httpClient.get(`/shipments/${shipmentId}`);
       const status = shipmentData.status;
       const substatus = shipmentData.substatus;
       sellerId = shipmentData.sender_id ? String(shipmentData.sender_id) : undefined;
+      receiverZipCode = shipmentData.receiver_address?.zip_code
+        ? String(shipmentData.receiver_address.zip_code)
+        : undefined;
 
-      logger.info(`[ML FISCAL] Status do shipment ${shipmentId}: ${status}/${substatus}. Dono do shipment (sender_id): ${sellerId ?? 'não retornado pelo ML'}`);
+      const cepNfe = this.extrairCepDestinatario(xmlContent);
+      logger.info(
+        `[ML FISCAL] Status do shipment ${shipmentId}: ${status}/${substatus}. Dono do shipment (sender_id): ${sellerId ?? 'não retornado pelo ML'}. ` +
+        `CEP do destinatário no ML: ${receiverZipCode ?? 'não retornado pelo ML'}. CEP do destinatário na NF-e: ${cepNfe ?? 'não encontrado no XML'}.` +
+        (receiverZipCode && cepNfe && this.normalizarCep(receiverZipCode) !== this.normalizarCep(cepNfe)
+          ? ' ATENÇÃO: CEPs divergentes — é isso que vai causar o erro "wrong_receiver_zipcode" no envio.'
+          : '')
+      );
 
       if (status !== 'ready_to_ship' || substatus !== 'invoice_pending') {
         logger.warn(
@@ -181,5 +192,19 @@ export class MercadoLivreFiscalService {
         error: `Erro ao enviar NF-e para ML: ${errorMsg}`,
       };
     }
+  }
+
+  /** Extrai o CEP de dentro do bloco <dest>...</dest> do XML da NF-e (destinatário, não emitente). */
+  private extrairCepDestinatario(xml: string): string | null {
+    const destMatch = xml.match(/<dest>[\s\S]*?<\/dest>/);
+    if (!destMatch) return null;
+
+    const cepMatch = destMatch[0].match(/<CEP>(\d+)<\/CEP>/);
+    return cepMatch ? cepMatch[1] : null;
+  }
+
+  /** Remove tudo que não for dígito, pra comparar CEPs em formatos diferentes (com/sem hífen). */
+  private normalizarCep(cep: string): string {
+    return cep.replace(/\D/g, '');
   }
 }
