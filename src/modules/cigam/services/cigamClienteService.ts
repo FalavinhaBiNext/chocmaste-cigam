@@ -35,6 +35,10 @@ export class CigamClienteService {
     const mapping = await this.deParaClientesRepo.findByIdBling(idClienteBling);
     if (mapping) {
       logger.success(`Mapeamento De-Para encontrado: ${idClienteBling} -> ${mapping.id_cigam}`);
+      logger.info(
+        `[CIGAM CLIENTE] Cliente já mapeado — nenhum dado é reenviado ao CIGAM nesse pedido. ` +
+        `O endereço/CEP do cliente no CIGAM é o que foi salvo na criação original (código ${mapping.id_cigam}), não é atualizado aqui.`
+      );
       return mapping.id_cigam;
     }
 
@@ -43,6 +47,17 @@ export class CigamClienteService {
     if (!clienteBling) {
       throw new Error(`Cliente Bling com ID ${idClienteBling} não encontrado no banco local.`);
     }
+
+    logger.info('[CIGAM CLIENTE] Dados do cliente no cadastro local (Bling)', {
+      nome: clienteBling.nome,
+      documento: clienteBling.documento,
+      endereco: clienteBling.endereco,
+      numero: clienteBling.numero,
+      bairro: clienteBling.bairro,
+      cidade: clienteBling.cidade,
+      uf: clienteBling.uf,
+      cep: clienteBling.cep,
+    });
 
     const docClean = clienteBling.documento ? clienteBling.documento.replace(/\D/g, '') : '';
     if (!docClean) {
@@ -72,6 +87,12 @@ export class CigamClienteService {
         if (matched) {
           idCigam = matched.Codigo;
           logger.success(`Cliente localizado no CIGAM com Código: ${idCigam}`);
+          logger.info(
+            `[CIGAM CLIENTE] Cliente já existia no CIGAM por CNPJ/CPF — nenhum dado é reenviado/atualizado. ` +
+            `Endereço/CEP no CIGAM é o cadastrado anteriormente lá, não o do cadastro local do Bling. ` +
+            `(A API de busca do CIGAM não retorna o CEP nesse endpoint — não dá pra comparar diretamente por aqui.)`,
+            { enderecoCadastradoNoCigam: matched.Endereco, numero: matched.Numero, bairro: matched.Bairro, uf: matched.Uf }
+          );
         }
       }
     } catch (error: any) {
