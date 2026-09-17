@@ -208,6 +208,25 @@ export class NotasFiscaisCigamService {
     return { success: true, message: 'NF-e enviada com sucesso ao marketplace.' };
   }
 
+  /**
+   * Mesma lógica de enviarParaMarketplace, mas localizando a nota a partir do
+   * numero_pedido_cigam — usado pelo botão "Enviar XML" na tela de Pedidos, que só
+   * tem os dados do pedido local (não o id da nota fiscal).
+   */
+  async enviarParaMarketplacePorPedidoCigam(numeroPedidoCigam: string): Promise<{ success: boolean; message: string }> {
+    const notas = await this.notasFiscaisCigamRepository.findByNumeroPedidoCigam(numeroPedidoCigam);
+    const nota = notas.find((n) => !n.enviado_marketplace) || notas[0];
+
+    if (!nota) {
+      return {
+        success: false,
+        message: `Nenhuma NF-e encontrada para o pedido CIGAM #${numeroPedidoCigam}.`,
+      };
+    }
+
+    return this.enviarParaMarketplace(nota.id);
+  }
+
   async deleteById(id: string): Promise<void> {
     logger.info(`[NF-E CIGAM] Excluindo nota fiscal ${id}`);
     const nota = await this.notasFiscaisCigamRepository.findById(id);

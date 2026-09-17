@@ -113,12 +113,15 @@ export class MercadoLivreFiscalService {
    * 3. Enviar o XML via POST /shipments/{shipmentId}/invoice_data
    */
   private async verificarEEnviar(shipmentId: string, xmlContent: string): Promise<EnviarNFeResult> {
+    let sellerId: string | undefined;
+
     try {
       const shipmentData: any = await this.httpClient.get(`/shipments/${shipmentId}`);
       const status = shipmentData.status;
       const substatus = shipmentData.substatus;
+      sellerId = shipmentData.sender_id ? String(shipmentData.sender_id) : undefined;
 
-      logger.info(`[ML FISCAL] Status do shipment ${shipmentId}: ${status}/${substatus}`);
+      logger.info(`[ML FISCAL] Status do shipment ${shipmentId}: ${status}/${substatus}. Dono do shipment (sender_id): ${sellerId ?? 'não retornado pelo ML'}`);
 
       if (status !== 'ready_to_ship' || substatus !== 'invoice_pending') {
         logger.warn(
@@ -141,6 +144,13 @@ export class MercadoLivreFiscalService {
       if (!token) {
         return { success: false, error: 'Nenhum token Mercado Livre ativo encontrado.' };
       }
+
+      const contaDivergente = sellerId && token.user_id_ml && sellerId !== token.user_id_ml;
+      logger.info(
+        `[ML FISCAL] Conta do token ativo: user_id_ml=${token.user_id_ml}, scope="${token.scope}". ` +
+        `Dono do shipment: sender_id=${sellerId ?? 'desconhecido'}.` +
+        (contaDivergente ? ' ATENÇÃO: user_id_ml do token é DIFERENTE do sender_id do shipment — o token pode não ter permissão sobre esse pedido.' : '')
+      );
 
       await axios.post(
         `${ML_API_BASE}/shipments/${shipmentId}/invoice_data/?siteId=MLB`,
