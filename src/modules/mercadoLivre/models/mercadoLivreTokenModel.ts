@@ -41,7 +41,7 @@ MercadoLivreTokenModel.init({
     allowNull: false,
   },
   scope: {
-    type: Sequelize.STRING,
+    type: Sequelize.TEXT,
     allowNull: true,
   },
   token_type: {
