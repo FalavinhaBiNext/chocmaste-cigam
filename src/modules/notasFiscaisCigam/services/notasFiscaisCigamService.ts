@@ -3,6 +3,7 @@ import { NotasFiscaisCigamRepository } from '../repositories/notasFiscaisCigamRe
 import { PedidoService } from '@/modules/pedido/services/pedidoService';
 import { MercadoLivreFiscalService } from '@/modules/mercadoLivre/services/mercadoLivreFiscalService';
 import { ShopeeFiscalService } from '@/modules/shopee/services/shopeeFiscalService';
+import { TrayFiscalService } from '@/modules/tray/services/trayFiscalService';
 import { ReceberNotaFiscalInput } from '../notasFiscaisCigam.validator';
 import { ResponseNotaFiscalCigamDTO } from '../dto';
 import { logger } from '@/shared/utils/logger';
@@ -19,6 +20,8 @@ export class NotasFiscaisCigamService {
     private readonly mercadoLivreFiscalService: MercadoLivreFiscalService,
     @inject(ShopeeFiscalService)
     private readonly shopeeFiscalService: ShopeeFiscalService,
+    @inject(TrayFiscalService)
+    private readonly trayFiscalService: TrayFiscalService,
   ) {}
 
   async receberNotaFiscal(input: ReceberNotaFiscalInput): Promise<ResponseNotaFiscalCigamDTO> {
@@ -179,10 +182,20 @@ export class NotasFiscaisCigamService {
 
       resultado = await this.mercadoLivreFiscalService.enviarNFePorShipmentId(shipmentInfo.shipmentId, nota.xml_content);
     } else {
-      return {
-        success: false,
-        message: `Envio automático de XML ainda não é suportado para o marketplace "${nota.marketplace}".`,
-      };
+      // Qualquer outro valor de marketplace vem do "Local de venda" extraído das
+      // observações do Bling (AMAZON, MAGAZINE LUIZA, LOJA VIRTUAL, PARTICULAR, etc.)
+      // — são todos canais vendidos através da mesma loja Tray, então passam pela
+      // mesma API de NF-e da Tray, usando numero_pedido_marketplace como order_id.
+      if (!nota.numero_pedido_marketplace) {
+        return { success: false, message: 'NF-e sem número de pedido do marketplace vinculado.' };
+      }
+
+      resultado = await this.trayFiscalService.enviarNFe(nota.numero_pedido_marketplace, {
+        numero: nota.numero_nf,
+        serie: nota.serie_nf,
+        chaveAcesso: nota.chave_acesso,
+        dataFaturamento: nota.data_faturamento,
+      });
     }
 
     if (!resultado.success) {

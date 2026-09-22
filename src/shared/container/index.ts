@@ -231,6 +231,7 @@ import { TrayAuthService } from '@/modules/tray/services/trayAuthService';
 import { TrayHttpClient } from '@/modules/tray/services/trayHttpClient';
 import { TrayShippingLabelService } from '@/modules/tray/services/trayShippingLabelService';
 import { TrayOrderService } from '@/modules/tray/services/trayOrderService';
+import { TrayFiscalService } from '@/modules/tray/services/trayFiscalService';
 import { TrayController } from '@/modules/tray/controllers/trayController';
 
 container.registerSingleton(TrayTokenRepository);
@@ -238,6 +239,7 @@ container.registerSingleton(TrayAuthService);
 container.registerSingleton(TrayHttpClient);
 container.registerSingleton(TrayOrderService);
 container.registerSingleton(TrayShippingLabelService);
+container.registerSingleton(TrayFiscalService);
 container.registerSingleton(TrayController);
 
 import { IntegrationHealthService } from '@/modules/integrations/services/integrationHealthService';
