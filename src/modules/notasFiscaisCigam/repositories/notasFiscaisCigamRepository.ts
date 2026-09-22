@@ -1,6 +1,7 @@
 import { injectable } from 'tsyringe';
 import { NotasFiscaisCigamModel } from '../models/notasFiscaisCigamModel';
 import { CreateNotaFiscalCigamDTO, ResponseNotaFiscalCigamDTO } from '../dto';
+import { parseDateOnly } from '@/shared/utils/date';
 
 @injectable()
 export class NotasFiscaisCigamRepository {
@@ -10,7 +11,7 @@ export class NotasFiscaisCigamRepository {
       numero_pedido_marketplace: data.numero_pedido_marketplace,
       marketplace: data.marketplace,
       unidade_negocio: data.unidade_negocio,
-      data_faturamento: data.data_faturamento,
+      data_faturamento: parseDateOnly(data.data_faturamento),
       numero_nf: data.numero_nf,
       serie_nf: data.serie_nf,
       chave_acesso: data.chave_acesso,

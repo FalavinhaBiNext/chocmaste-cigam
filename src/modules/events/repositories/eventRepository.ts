@@ -4,6 +4,7 @@ import { IEventRepository } from "../interfaces/IEventRepository";
 import { ResponseEventDTO } from "../dto";
 import { CreateEventInput } from "../events.validator";
 import { EventMapper } from "../mappers/EventMapper";
+import { parseDateOnly } from "@/shared/utils/date";
 
 @injectable()
 export class EventRepository implements IEventRepository {
@@ -13,7 +14,7 @@ export class EventRepository implements IEventRepository {
             event: data.event,
             company_id: data.company_id,
             pedido_id: data.pedido_id,
-            data_pedido: data.data_pedido,
+            data_pedido: parseDateOnly(data.data_pedido) || undefined,
             numero_pedido: data.numero_pedido,
             numero_loja: data.numero_loja,
             total_pedido: data.total_pedido

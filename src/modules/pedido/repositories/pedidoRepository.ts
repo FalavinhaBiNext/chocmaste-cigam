@@ -4,6 +4,7 @@ import { IPedidoRepository } from "../interfaces/IPedidoRepository";
 import { ResponsePedidoDTO, UpdatePedidoDTO } from "../dto";
 import { CreatePedidoInput } from "../pedido.validator";
 import { PedidoMapper } from "../mappers/PedidoMapper";
+import { parseDateOnly } from "@/shared/utils/date";
 
 @injectable()
 export class PedidoRepository implements IPedidoRepository {
@@ -12,7 +13,7 @@ export class PedidoRepository implements IPedidoRepository {
       id_bling: data.id_bling,
       codigo_curto: data.codigo_curto,
       numero_loja: data.numero_loja,
-      data_pedido: data.data_pedido,
+      data_pedido: parseDateOnly(data.data_pedido) || new Date().toISOString().slice(0, 10),
       total_produtos: data.total_produtos,
       total_venda: data.total_venda,
       id_cliente_bling: data.id_cliente_bling,
@@ -28,7 +29,7 @@ export class PedidoRepository implements IPedidoRepository {
       nome_transportadora: data.nome_transportadora,
       codigo_rastreio: data.codigo_rastreio,
       unidade_negocio: data.unidade_negocio,
-      data_prevista: data.data_prevista,
+      data_prevista: parseDateOnly(data.data_prevista) || undefined,
     });
 
     return PedidoMapper.pedidoToDTO(pedido);
@@ -105,7 +106,15 @@ export class PedidoRepository implements IPedidoRepository {
       return null;
     }
 
-    await pedido.update(data);
+    const payload = { ...data };
+    if (payload.data_pedido !== undefined) {
+      payload.data_pedido = parseDateOnly(payload.data_pedido) || undefined;
+    }
+    if (payload.data_prevista !== undefined) {
+      payload.data_prevista = parseDateOnly(payload.data_prevista) || undefined;
+    }
+
+    await pedido.update(payload);
 
     return PedidoMapper.pedidoToDTO(pedido);
   }

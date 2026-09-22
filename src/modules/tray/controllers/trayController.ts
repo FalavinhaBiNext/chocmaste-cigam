@@ -171,7 +171,7 @@ export class TrayController {
       status: status ? String(status) : undefined,
       page: page ? Number(page) : undefined,
       limit: limit ? Number(limit) : undefined,
-      sort: sort ? String(sort) : undefined,
+      sort: sort ? String(sort) : 'id_desc',
       modified: modified ? String(modified) : undefined,
     });
 

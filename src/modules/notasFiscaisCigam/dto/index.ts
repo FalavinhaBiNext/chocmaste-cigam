@@ -3,7 +3,7 @@ export interface CreateNotaFiscalCigamDTO {
   numero_pedido_marketplace?: string;
   marketplace?: string;
   unidade_negocio?: string;
-  data_faturamento?: string;
+  data_faturamento?: string | null;
   numero_nf?: string;
   serie_nf?: string;
   chave_acesso?: string;

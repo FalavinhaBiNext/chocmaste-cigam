@@ -7,6 +7,7 @@ import { TrayFiscalService } from '@/modules/tray/services/trayFiscalService';
 import { ReceberNotaFiscalInput } from '../notasFiscaisCigam.validator';
 import { ResponseNotaFiscalCigamDTO } from '../dto';
 import { logger } from '@/shared/utils/logger';
+import { parseDateOnly } from '@/shared/utils/date';
 import { ConflictError, NotFoundError } from '@/shared/errors/AppError';
 
 @injectable()
@@ -54,7 +55,7 @@ export class NotasFiscaisCigamService {
       numero_pedido_marketplace: numeroPedidoMarketplace,
       marketplace: pedidoVinculado?.marketplace || null,
       unidade_negocio: input.unidadeNegocio,
-      data_faturamento: input.dataFaturamento,
+      data_faturamento: parseDateOnly(input.dataFaturamento),
       numero_nf: input.numeroNf,
       serie_nf: input.serieNf,
       chave_acesso: input.chaveAcessoNfe,

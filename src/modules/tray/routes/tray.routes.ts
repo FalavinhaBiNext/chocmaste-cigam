@@ -18,10 +18,13 @@ export function createTrayRoutes(controller: TrayController): Router {
   // Loja
   router.get('/info', asyncHandler(controller.getStoreInfo));
 
-  // Pedidos
+  // Pedidos (compatibilidade com /orders e /pedidos)
   router.get('/orders', asyncHandler(controller.listOrders));
   router.get('/orders/:orderId/complete', asyncHandler(controller.getOrderComplete));
   router.get('/orders/:orderId', asyncHandler(controller.getOrder));
+  router.get('/pedidos', asyncHandler(controller.listOrders));
+  router.get('/pedidos/:orderId/complete', asyncHandler(controller.getOrderComplete));
+  router.get('/pedidos/:orderId', asyncHandler(controller.getOrder));
 
   // Emissor de etiqueta
   router.post('/shipping-label/register', asyncHandler(controller.registerShippingLabel));

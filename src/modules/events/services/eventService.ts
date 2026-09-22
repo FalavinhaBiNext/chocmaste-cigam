@@ -2,6 +2,7 @@ import { injectable, inject } from 'tsyringe';
 import { CreateEventInput } from "../events.validator";
 import { ResponseEventDTO } from "../dto";
 import { logger } from "@/shared/utils/logger";
+import { parseDateOnly } from "@/shared/utils/date";
 import { NotFoundError } from "@/shared/errors/AppError";
 import { EventRepository } from "../repositories/eventRepository";
 import { randomUUID } from 'crypto';
@@ -26,7 +27,7 @@ export class EventService {
             id: id,
             event: data.event,
             company_id: data.companyId,
-            data_pedido: data.data.data,
+            data_pedido: parseDateOnly(data.data.data) || new Date().toISOString().slice(0, 10),
             pedido_id: data.data.id,
             numero_pedido: data.data.numero,
             numero_loja: data.data.numeroLoja,

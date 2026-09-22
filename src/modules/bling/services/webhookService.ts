@@ -10,6 +10,7 @@ import { ClientesService } from '@/modules/clientes/services/clientesService';
 import { PedidoWebhookInput } from '../blingWebhook.validator';
 import { logger } from '@/shared/utils/logger';
 import { delay } from '@/shared/utils/delay';
+import { parseDateOnly } from '@/shared/utils/date';
 import { IntegrationError } from '@/shared/errors/AppError';
 import { ContatosService } from './contatosService';
 import { FormaPagamentoBlingService } from './formaPagamentoBlingService';
@@ -190,7 +191,7 @@ export class WebhookService {
       await this.pedidoService.update(pedido.id, {
         codigo_curto: String(data.numero),
         numero_loja: data.numeroLoja,
-        data_pedido: data.data,
+        data_pedido: parseDateOnly(data.data) || new Date().toISOString().slice(0, 10),
         total_produtos: data.totalProdutos,
         total_venda: data.total,
         id_cliente_bling: String(data.contato.id),
@@ -206,7 +207,7 @@ export class WebhookService {
         nome_transportadora: transportadoraNome,
         codigo_rastreio: codigoRastreio,
         unidade_negocio: unidadeNegocio,
-        data_prevista: data.dataPrevista || undefined,
+        data_prevista: parseDateOnly(data.dataPrevista) || undefined,
         marketplace: marketplace,
       });
     } catch {
@@ -214,7 +215,7 @@ export class WebhookService {
         id_bling: String(data.id),
         codigo_curto: String(data.numero),
         numero_loja: data.numeroLoja,
-        data_pedido: data.data,
+        data_pedido: parseDateOnly(data.data) || new Date().toISOString().slice(0, 10),
         total_produtos: data.totalProdutos,
         total_venda: data.total,
         id_cliente_bling: String(data.contato.id),
@@ -230,7 +231,7 @@ export class WebhookService {
         nome_transportadora: transportadoraNome,
         codigo_rastreio: codigoRastreio,
         unidade_negocio: unidadeNegocio,
-        data_prevista: data.dataPrevista || undefined,
+        data_prevista: parseDateOnly(data.dataPrevista) || undefined,
         marketplace: marketplace,
       });
     }
