@@ -9,6 +9,7 @@ const PUBLIC_PATHS = [
     '/events/health',
     '/bling/callback',
     '/bling/webhook',
+    '/tray/callback',
     '/notas-fiscais-cigam',
 ];
 

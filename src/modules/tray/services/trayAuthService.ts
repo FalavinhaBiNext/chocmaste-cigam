@@ -52,12 +52,13 @@ export class TrayAuthService {
       throw new IntegrationError('TRAY_CONSUMER_KEY e TRAY_CONSUMER_SECRET não configurados no servidor.');
     }
 
+    const cleanAddress = this.normalizeApiAddress(apiAddress);
     logger.auth('Trocando authorization code por token na Tray...');
-    logger.api(`Chamando POST https://${apiAddress}/auth`);
+    logger.api(`Chamando POST https://${cleanAddress}/auth`);
 
     try {
       const response = await axios.post<TrayAuthResponse>(
-        `https://${apiAddress}/auth`,
+        `https://${cleanAddress}/auth`,
         {
           consumer_key: finalConsumerKey,
           consumer_secret: finalConsumerSecret,
@@ -82,7 +83,7 @@ export class TrayAuthService {
 
       await this.tokenRepository.save({
         store_id: tokenData.store_id,
-        api_address: apiAddress,
+        api_address: cleanAddress,
         consumer_key: finalConsumerKey,
         access_token: tokenData.access_token,
         refresh_token: tokenData.refresh_token,
@@ -115,12 +116,13 @@ export class TrayAuthService {
       throw new IntegrationError('Token Tray não encontrado para renovação.');
     }
 
+    const cleanAddress = this.normalizeApiAddress(token.api_address);
     logger.auth('Renovando token Tray via refresh_token...');
-    logger.api(`Chamando GET https://${token.api_address}/auth`);
+    logger.api(`Chamando GET https://${cleanAddress}/auth`);
 
     try {
       const response = await axios.get<TrayRefreshResponse>(
-        `https://${token.api_address}/auth`,
+        `https://${cleanAddress}/auth`,
         {
           params: { refresh_token: token.refresh_token },
           headers: { Accept: 'application/json' },
@@ -163,15 +165,26 @@ export class TrayAuthService {
 
   private tryBuildRecoveryAuthUrl(token: TrayTokenDTO): string | null {
     try {
-      const domain = token.api_address.replace(/\/web_api\/?$/, '');
+      const domain = this.normalizeApiAddress(token.api_address).replace(/\/web_api\/?$/, '');
       return this.generateAuthURL(domain, token.consumer_key);
     } catch {
       return null;
     }
   }
 
+  private normalizeApiAddress(address: string): string {
+    let clean = address.replace(/^https?:\/\//, '').replace(/\/+$/, '');
+    if (!clean.endsWith('/web_api')) {
+      clean = `${clean}/web_api`;
+    }
+    return clean;
+  }
+
   private normalizeDomain(storeDomain: string): string {
-    return storeDomain.replace(/^https?:\/\//, '').replace(/\/+$/, '');
+    return storeDomain
+      .replace(/^https?:\/\//, '')
+      .replace(/\/web_api\/?$/, '')
+      .replace(/\/+$/, '');
   }
 
   private mapAuthError(error: any, prefix: string): Error {

@@ -67,10 +67,13 @@ export class TrayHttpClient {
   ): Promise<T> {
     const { apiAddress, accessToken } = await this.ensureValidToken();
 
+    const cleanAddress = apiAddress.replace(/^https?:\/\//, '').replace(/\/+$/, '');
+    const cleanUrl = url.startsWith('/') ? url : `/${url}`;
+
     try {
       const response = await axios.request<T>({
         method,
-        url: `https://${apiAddress}${url}`,
+        url: `https://${cleanAddress}${cleanUrl}`,
         data,
         ...config,
         params: { ...config?.params, access_token: accessToken },
