@@ -21,7 +21,7 @@ export class CigamPedidoService {
     @inject(DeParaFormasPagamentoRepository) private readonly deParaFormasPagamentoRepo: DeParaFormasPagamentoRepository,
     @inject(DeParaProdutosRepository) private readonly deParaProdutosRepo: DeParaProdutosRepository,
     @inject(PedidoService) private readonly pedidoService: PedidoService,
-  ) {}
+  ) { }
 
   private async getActiveEnv(): Promise<string> {
     const usuarios = await this.usuarioCigamService.findAll();
@@ -123,7 +123,8 @@ export class CigamPedidoService {
       PrazoEntrega: prazo,
       PrazoProgramado: pedidoBling.dataPrevista || prazo,
       OrigemPedido: 'Bling Integration',
-      UnidadeNegocio: unidadeNegocio || '',
+      // UnidadeNegocio: unidadeNegocio || '',
+      UnidadeNegocio: unidadeNegocio || process.env.CIGAM_DEFAULT_UNIDADE_NEGOCIO || '',
       ...(codigoConta ? { CodigoConta: codigoConta } : {}),
     };
 
