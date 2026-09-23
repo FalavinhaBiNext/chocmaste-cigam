@@ -12,6 +12,8 @@ export interface NotaFiscalTrayInput {
   serie: string | null;
   chaveAcesso: string | null;
   dataFaturamento: string | null;
+  valor?: number | string | null;
+  xml?: string | null;
 }
 
 @injectable()
@@ -20,11 +22,33 @@ export class TrayFiscalService {
     @inject(TrayHttpClient) private readonly httpClient: TrayHttpClient,
   ) {}
 
+  private extrairValorXml(xml?: string | null): number | null {
+    if (!xml) return null;
+    const match = xml.match(/<vNF>([0-9.]+)<\/vNF>/);
+    if (match && match[1]) {
+      const parsed = parseFloat(match[1]);
+      return isNaN(parsed) ? null : parsed;
+    }
+    return null;
+  }
+
+  private formatarData(data: string | null): string {
+    if (!data) return new Date().toISOString().slice(0, 10);
+    const cleaned = data.trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(cleaned)) {
+      return cleaned.slice(0, 10);
+    }
+    const ddmmyyyy = cleaned.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+    if (ddmmyyyy) {
+      return `${ddmmyyyy[3]}-${ddmmyyyy[2]}-${ddmmyyyy[1]}`;
+    }
+    return cleaned;
+  }
+
   /**
    * Registra a NF-e no pedido Tray via POST /orders/:order_id/invoices.
-   * A Tray não recebe o XML — só os metadados estruturados da nota. A chave
-   * de acesso (44 dígitos) é o único campo que a Tray usa pra vincular a nota
-   * de verdade; o restante é só exibido no admin da loja.
+   * A Tray espera o wrapper OrderInvoice com: number, serie, issue_date (YYYY-MM-DD),
+   * key (44 dígitos) e value (numérico).
    */
   async enviarNFe(orderId: string, nota: NotaFiscalTrayInput): Promise<EnviarNFeTrayResult> {
     logger.info(`[TRAY FISCAL] Iniciando registro de NF-e para pedido ${orderId}`);
@@ -45,13 +69,17 @@ export class TrayFiscalService {
       };
     }
 
+    const valorFinal = Number(nota.valor) || this.extrairValorXml(nota.xml) || 0;
+    const issueDate = this.formatarData(nota.dataFaturamento);
+
     try {
       await this.httpClient.post(`/orders/${orderId}/invoices`, {
-        Invoice: {
-          number: nota.numero,
-          series: nota.serie,
-          issue_date: nota.dataFaturamento,
-          key: nota.chaveAcesso,
+        OrderInvoice: {
+          number: String(nota.numero).trim(),
+          serie: String(nota.serie).trim(),
+          issue_date: issueDate,
+          key: String(nota.chaveAcesso).trim(),
+          value: Number(valorFinal.toFixed(2)),
         },
       });
 

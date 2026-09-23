@@ -191,11 +191,23 @@ export class NotasFiscaisCigamService {
         return { success: false, message: 'NF-e sem número de pedido do marketplace vinculado.' };
       }
 
+      let valorPedido: number | undefined;
+      try {
+        const pedidoVinculado = await this.pedidoService.findByNumeroPedidoCigam(nota.numero_pedido_cigam);
+        if (pedidoVinculado?.total_venda) {
+          valorPedido = Number(pedidoVinculado.total_venda);
+        }
+      } catch {
+        // Ignora se não localizar o pedido vinculado
+      }
+
       resultado = await this.trayFiscalService.enviarNFe(nota.numero_pedido_marketplace, {
         numero: nota.numero_nf,
         serie: nota.serie_nf,
         chaveAcesso: nota.chave_acesso,
         dataFaturamento: nota.data_faturamento,
+        valor: valorPedido,
+        xml: nota.xml_content,
       });
     }
 
