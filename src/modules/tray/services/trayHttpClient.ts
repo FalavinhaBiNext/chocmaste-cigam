@@ -119,7 +119,15 @@ export class TrayHttpClient {
   private mapError(error: any, errorCode?: number): Error {
     const status = error.response?.status;
     const data: TrayErrorResponse | undefined = error.response?.data;
-    const message = data?.causes?.join(', ') || data?.message || error.message;
+    const causesText = Array.isArray(data?.causes)
+      ? data.causes.join(', ')
+      : typeof data?.causes === 'string'
+      ? data.causes
+      : data?.causes
+      ? JSON.stringify(data.causes)
+      : undefined;
+
+    const message = causesText || data?.message || error.message;
 
     logger.error(`Erro na API Tray [${status}] error_code=${errorCode}`, { message });
 

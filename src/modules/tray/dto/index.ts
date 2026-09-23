@@ -50,7 +50,7 @@ export interface TrayErrorResponse {
   code?: number;
   message?: string;
   error_code?: number;
-  causes?: string[];
+  causes?: string[] | string | Record<string, any>;
 }
 
 /**

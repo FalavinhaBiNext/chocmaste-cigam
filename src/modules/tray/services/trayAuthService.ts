@@ -189,7 +189,15 @@ export class TrayAuthService {
 
   private mapAuthError(error: any, prefix: string): Error {
     const data: TrayErrorResponse | undefined = error.response?.data;
-    const message = data?.causes?.join(', ') || data?.message || error.message;
+    const causesText = Array.isArray(data?.causes)
+      ? data.causes.join(', ')
+      : typeof data?.causes === 'string'
+      ? data.causes
+      : data?.causes
+      ? JSON.stringify(data.causes)
+      : undefined;
+
+    const message = causesText || data?.message || error.message;
     const status = error.response?.status;
 
     logger.error(`${prefix} [${status}] error_code=${data?.error_code}: ${message}`);
