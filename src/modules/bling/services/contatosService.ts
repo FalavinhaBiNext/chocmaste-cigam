@@ -1,6 +1,7 @@
 import { inject, injectable } from 'tsyringe';
 import { BlingHttpClient } from './blingHttpClient';
 import { ContatoBlingDTO, ContatoBlingListResponse, ContatoBlingSingleResponse, BlingContatosListResponse } from '../dto';
+import { logger } from '@/shared/utils/logger';
 
 @injectable()
 export class ContatosService {
@@ -30,20 +31,35 @@ export class ContatosService {
     );
   }
 
-  async listAll(tipoContato?: number, tokenId?: string): Promise<ContatoBlingDTO[]> {
+  async listAll(
+    tipoContato?: number,
+    onLogOrTokenId?: ((msg: string) => void) | string,
+    tokenIdParam?: string,
+  ): Promise<ContatoBlingDTO[]> {
+    const onLog = typeof onLogOrTokenId === 'function' ? onLogOrTokenId : undefined;
+    const tokenId = typeof onLogOrTokenId === 'string' ? onLogOrTokenId : tokenIdParam;
+
+    const log = (msg: string) => {
+      logger.info(msg);
+      if (onLog) onLog(msg);
+    };
+
     const all: ContatoBlingDTO[] = [];
     let pagina = 1;
 
     while (true) {
+      log(`[BLING] Consultando página ${pagina} de contatos...`);
       const response = await this.list(pagina, 100, tipoContato, tokenId);
       if (!response.data || response.data.length === 0) {
         break;
       }
       all.push(...response.data);
+      log(`[BLING] Página ${pagina}: ${response.data.length} contatos encontrados`);
       pagina++;
-      await new Promise(resolve => setTimeout(resolve, 300));
+      await new Promise(resolve => setTimeout(resolve, 600));
     }
 
+    log(`[BLING] Listagem finalizada: total de ${all.length} contatos obtidos em ${pagina - 1} páginas.`);
     return all;
   }
 

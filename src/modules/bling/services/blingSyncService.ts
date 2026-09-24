@@ -99,7 +99,7 @@ export class BlingSyncService {
     const result: SyncBlingResultDTO = { entity: 'clientes', imported: 0, updated: 0, errors: [] };
 
     try {
-      const items = await this.blingContatos.listAll(2, tokenId); // 2 = Cliente
+      const items = await this.blingContatos.listAll(2, onProgress, tokenId); // 2 = Cliente
       log(`Encontrados ${items.length} clientes no Bling`);
 
       for (const listItem of items) {
@@ -210,7 +210,7 @@ export class BlingSyncService {
     const result: SyncBlingResultDTO = { entity: 'transportadoras', imported: 0, updated: 0, errors: [] };
 
     try {
-      const items = await this.blingContatos.listAll(undefined, tokenId);
+      const items = await this.blingContatos.listAll(undefined, onProgress, tokenId);
       const transportadoras = items.filter(c => c.tipo === 'Transportador');
       log(`Encontradas ${transportadoras.length} transportadoras no Bling`);
 

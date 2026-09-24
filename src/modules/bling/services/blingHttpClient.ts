@@ -50,7 +50,7 @@ export class BlingHttpClient {
     const expiresAt = token.expires_at ? new Date(token.expires_at) : null;
     const timeUntilExpiry = expiresAt ? expiresAt.getTime() - now.getTime() : null;
 
-    logger.auth('Verificando validade do token Bling', {
+    logger.debug('Verificando validade do token Bling', {
       hasToken: true,
       expiresAt: expiresAt?.toISOString(),
       timeUntilExpiryMs: timeUntilExpiry,
@@ -61,6 +61,7 @@ export class BlingHttpClient {
       logger.auth('Token Bling expirado ou prestes a expirar. Renovando...');
       await this.blingOAuthService.refreshAccessToken(token.id);
       const refreshedToken = await this.blingRepository.findById(token.id);
+      logger.auth('Token Bling renovado com sucesso.');
       return refreshedToken!.access_token;
     }
 
