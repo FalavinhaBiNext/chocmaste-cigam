@@ -52,11 +52,20 @@ export class NotasFiscaisCigamService {
       logger.info(`[NF-E CIGAM] Pedido CIGAM ${input.numeroPedido} não encontrado na tabela pedidos. Salvando sem vinculação.`);
     }
 
+    // Identificar marketplace a partir do pedido vinculado ou inferir pelo formato do número
+    let marketplaceFinal = pedidoVinculado?.marketplace || null;
+    if (!marketplaceFinal) {
+      const numMkt = numeroPedidoMarketplace || pedidoVinculado?.numero_loja || '';
+      if (/^20000\d+/.test(numMkt)) {
+        marketplaceFinal = 'mercado_livre';
+      }
+    }
+
     // Salvar a NF-e no banco
     const nota = await this.notasFiscaisCigamRepository.create({
       numero_pedido_cigam: input.numeroPedido,
       numero_pedido_marketplace: numeroPedidoMarketplace,
-      marketplace: pedidoVinculado?.marketplace || null,
+      marketplace: marketplaceFinal,
       unidade_negocio: input.unidadeNegocio,
       data_faturamento: parseDateOnly(input.dataFaturamento),
       numero_nf: input.numeroNf,
@@ -71,16 +80,18 @@ export class NotasFiscaisCigamService {
     // Atualizar status_nfe do pedido para 'faturada'
     if (pedidoVinculado) {
       try {
-        await this.pedidoService.update(pedidoVinculado.id, {
-          status_nfe: 'faturada',
-        });
+        const updateData: any = { status_nfe: 'faturada' };
+        if (!pedidoVinculado.marketplace && marketplaceFinal) {
+          updateData.marketplace = marketplaceFinal;
+        }
+        await this.pedidoService.update(pedidoVinculado.id, updateData);
         logger.info(`[NF-E CIGAM] Pedido ${pedidoVinculado.id} atualizado para status_nfe=faturada`);
       } catch (error: any) {
         logger.error(`[NF-E CIGAM] Erro ao atualizar status_nfe do pedido: ${error.message}`);
       }
 
       // Se o marketplace for Mercado Livre, enviar a NF-e
-      if (pedidoVinculado.marketplace === 'mercado_livre' && numeroPedidoMarketplace) {
+      if ((marketplaceFinal === 'mercado_livre' || pedidoVinculado.marketplace === 'mercado_livre') && numeroPedidoMarketplace) {
         logger.info(`[NF-E CIGAM] Pedido é do Mercado Livre. Iniciando envio de NF-e...`);
 
         const resultado = await this.mercadoLivreFiscalService.enviarNFe(
@@ -200,8 +211,35 @@ export class NotasFiscaisCigamService {
       }
     }
 
-    if (!nota.marketplace) {
+    let marketplace = nota.marketplace;
+    let pedidoVinculado: any = null;
+
+    if (!marketplace) {
+      try {
+        pedidoVinculado = await this.pedidoService.findByNumeroPedidoCigam(nota.numero_pedido_cigam);
+        if (pedidoVinculado?.marketplace) {
+          marketplace = pedidoVinculado.marketplace;
+        }
+      } catch {}
+    }
+
+    if (!marketplace) {
+      const numMkt = nota.numero_pedido_marketplace || pedidoVinculado?.numero_loja || '';
+      if (/^20000\d+/.test(numMkt)) {
+        marketplace = 'mercado_livre';
+      }
+    }
+
+    if (!marketplace) {
       return { success: false, message: 'Esta NF-e não está vinculada a um pedido de marketplace.' };
+    }
+
+    if (!nota.marketplace && marketplace) {
+      await this.notasFiscaisCigamRepository.updateMarketplace(nota.id, marketplace);
+      if (pedidoVinculado && !pedidoVinculado.marketplace) {
+        await this.pedidoService.update(pedidoVinculado.id, { marketplace });
+      }
+      nota.marketplace = marketplace;
     }
 
     let resultado: { success: boolean; error?: string };

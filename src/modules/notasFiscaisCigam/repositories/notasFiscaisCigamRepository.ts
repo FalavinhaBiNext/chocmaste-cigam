@@ -66,6 +66,13 @@ export class NotasFiscaisCigamRepository {
     );
   }
 
+  async updateMarketplace(id: string, marketplace: string): Promise<void> {
+    await NotasFiscaisCigamModel.update(
+      { marketplace },
+      { where: { id } }
+    );
+  }
+
   async deleteById(id: string): Promise<void> {
     await NotasFiscaisCigamModel.destroy({ where: { id } });
   }

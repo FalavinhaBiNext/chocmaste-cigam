@@ -30,6 +30,10 @@ export class PedidoRepository implements IPedidoRepository {
       codigo_rastreio: data.codigo_rastreio,
       unidade_negocio: data.unidade_negocio,
       data_prevista: parseDateOnly(data.data_prevista) || undefined,
+      marketplace: data.marketplace,
+      status_nfe: data.status_nfe,
+      shipping_id: data.shipping_id,
+      numero_pedido_cigam: data.numero_pedido_cigam,
     });
 
     return PedidoMapper.pedidoToDTO(pedido);

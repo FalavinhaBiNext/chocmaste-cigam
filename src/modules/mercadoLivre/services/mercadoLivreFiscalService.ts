@@ -134,9 +134,10 @@ export class MercadoLivreFiscalService {
           : '')
       );
 
-      // Se a NF-e já foi processada anteriormente e a etiqueta já está pronta ou impressa, ou despachada
+      // Se a NF-e já foi processada anteriormente e a etiqueta já está pronta, impressa ou despachada
+      const substatusAceitos = ['ready_to_print', 'printed', 'dropped_off', 'in_hub', 'in_transit', 'out_for_delivery'];
       const jaProcessadoNoMl =
-        (status === 'ready_to_ship' && (substatus === 'ready_to_print' || substatus === 'printed')) ||
+        (status === 'ready_to_ship' && substatusAceitos.includes(substatus)) ||
         status === 'shipped' ||
         status === 'delivered';
 
