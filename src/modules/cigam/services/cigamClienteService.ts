@@ -4,6 +4,7 @@ import { UsuarioCigamService } from '@/modules/usuarioCigam/services/usuarioCiga
 import { ClientesCigamService } from '@/modules/clientesCigam/services/clientesCigamService';
 import { DeParaClientesRepository } from '@/modules/depara/repositories/deparaClientesRepository';
 import { ClientesService } from '@/modules/clientes/services/clientesService';
+import { CigamMunicipioService } from './cigamMunicipioService';
 import { CigamPessoaResponse } from './types';
 import { logger } from '@/shared/utils/logger';
 import { delay } from '@/shared/utils/delay';
@@ -16,6 +17,7 @@ export class CigamClienteService {
     @inject(ClientesCigamService) private readonly clientesCigamService: ClientesCigamService,
     @inject(DeParaClientesRepository) private readonly deParaClientesRepo: DeParaClientesRepository,
     @inject(ClientesService) private readonly clientesService: ClientesService,
+    @inject(CigamMunicipioService) private readonly cigamMunicipioService: CigamMunicipioService,
   ) {}
 
   private async getActiveEnv(): Promise<string> {
@@ -103,9 +105,11 @@ export class CigamClienteService {
     if (!idCigam) {
       logger.info(`Cliente não encontrado no CIGAM. Cadastrando cliente: ${clienteBling.nome}`);
 
-      const cidadeNormalizada = clienteBling.cidade
-        ? clienteBling.cidade.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase()
-        : '';
+      const cidadeResolvida = await this.cigamMunicipioService.resolverMunicipio(
+        clienteBling.cidade || '',
+        clienteBling.uf || '',
+        clienteBling.cep || ''
+      );
 
       const payload = {
         NomeCompleto: (clienteBling.nome || '').toUpperCase(),
@@ -115,7 +119,7 @@ export class CigamClienteService {
         Endereco: (clienteBling.endereco || '').toUpperCase(),
         Numero: (clienteBling.numero || '').toUpperCase(),
         Bairro: (clienteBling.bairro || '').toUpperCase(),
-        Municipio: cidadeNormalizada, // cidadeNormalizada is already toUpperCase() above
+        Municipio: cidadeResolvida,
         Uf: (clienteBling.uf || '').toUpperCase(),
         Telefone: clienteBling.telefone || clienteBling.celular || '',
         Email: (clienteBling.email || '').toUpperCase(),

@@ -31,6 +31,16 @@ export interface CigamCondicaoPagamentoResponse {
   Ativo: boolean;
 }
 
+export interface CigamMunicipioItem {
+  NomeMunicipio: string;
+  UF: string;
+  Codigo: string;
+  CodigoGiaEstadual?: string;
+  CEPInicial?: number;
+  CEPFinal?: number;
+  CodigoPais?: string;
+}
+
 // --- CIGAM Integrador (CadastroMateriais.integrador) ---
 
 export interface CigamIntegradorMaterialPayload {

@@ -63,6 +63,9 @@ describe('CigamTransportadoraService', () => {
         }),
       } as any,
       contatosService,
+      {
+        resolverMunicipio: vi.fn().mockImplementation((m: string) => Promise.resolve(m.toUpperCase())),
+      } as any,
     );
   });
 

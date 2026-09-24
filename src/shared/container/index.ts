@@ -151,6 +151,7 @@ container.registerSingleton(DeParaUnidadesNegocioRepository);
 container.registerSingleton(DeParaService);
 container.registerSingleton(DeParaController);
 
+import { CigamMunicipioService } from '@/modules/cigam/services/cigamMunicipioService';
 import { CigamClienteService } from '@/modules/cigam/services/cigamClienteService';
 import { CigamTransportadoraService } from '@/modules/cigam/services/cigamTransportadoraService';
 import { CigamPedidoService } from '@/modules/cigam/services/cigamPedidoService';
@@ -167,6 +168,7 @@ container.registerSingleton(UsuarioRepository);
 container.registerSingleton(UsuarioService);
 container.registerSingleton(UsuarioController);
 
+container.registerSingleton(CigamMunicipioService);
 container.registerSingleton(CigamClienteService);
 container.registerSingleton(CigamTransportadoraService);
 container.registerSingleton(CigamPedidoService);

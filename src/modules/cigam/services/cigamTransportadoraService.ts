@@ -8,6 +8,7 @@ import { CigamPessoaResponse } from './types';
 import { logger } from '@/shared/utils/logger';
 import { delay } from '@/shared/utils/delay';
 import { ContatosService } from '@/modules/bling/services/contatosService';
+import { CigamMunicipioService } from './cigamMunicipioService';
 
 @injectable()
 export class CigamTransportadoraService {
@@ -18,6 +19,7 @@ export class CigamTransportadoraService {
     @inject(DeParaTransportadorasRepository) private readonly deParaTransportadorasRepo: DeParaTransportadorasRepository,
     @inject(TransportadoraService) private readonly transportadoraService: TransportadoraService,
     @inject(ContatosService) private readonly contatosService: ContatosService,
+    @inject(CigamMunicipioService) private readonly cigamMunicipioService: CigamMunicipioService,
   ) {}
 
   private async getActiveEnv(): Promise<string> {
@@ -97,12 +99,14 @@ export class CigamTransportadoraService {
       }
 
       const endereco = transportadoraDetalhada.endereco?.geral;
-      const municipio = endereco?.municipio
-        ? endereco.municipio.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toUpperCase()
-        : '';
       const uf = (endereco?.uf || '').trim().toUpperCase();
+      const municipioResolvido = await this.cigamMunicipioService.resolverMunicipio(
+        endereco?.municipio || '',
+        uf,
+        endereco?.cep || ''
+      );
 
-      if (!municipio || !uf) {
+      if (!municipioResolvido || !uf) {
         throw new Error(
           `A transportadora ${transportadoraDetalhada.nome || transportadoraBling.nome} não possui município e UF no endereço geral da Bling.`,
         );
@@ -118,7 +122,7 @@ export class CigamTransportadoraService {
         Numero: (endereco?.numero || '').trim().toUpperCase(),
         Complemento: (endereco?.complemento || '').trim().toUpperCase(),
         Bairro: (endereco?.bairro || '').trim().toUpperCase(),
-        Municipio: municipio,
+        Municipio: municipioResolvido,
         Uf: uf,
         Telefone: transportadoraDetalhada.telefone || transportadoraDetalhada.celular || '',
         Email: (transportadoraDetalhada.email || '').trim().toUpperCase(),
