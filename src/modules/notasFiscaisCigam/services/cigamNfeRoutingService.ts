@@ -19,12 +19,16 @@ export interface RoutingDecision {
 
 // Mapeamento padrão de CNPJ para Unidade de Negócio e URLs
 const CNPJ_UNIDADE_MAP: Record<string, { unidade: string; nome: string }> = {
-  '10330589000140': { unidade: '001', nome: 'Chocmaster Matriz' },
-  '42817349000160': { unidade: '004', nome: 'Madalena Pet Store' },
+  '10330589000140': { unidade: '001', nome: 'MIRANDA E VIEIRA LTDA (E-COMMERCE)' },
+  '10330589000492': { unidade: '002', nome: 'MIRANDA E VIEIRA LTDA (INDUSTRIA)' },
+  '10330589000301': { unidade: '003', nome: 'MIRANDA E VIEIRA LTDA (ML FULL)' },
+  '42817349000160': { unidade: '004', nome: 'MADALENA' },
 };
 
 const DEFAULT_URL_MAP: Record<string, string> = {
   '001': 'https://api-chocmaster.falavinhanext.tec.br/api/v1/notas-fiscais-cigam',
+  '002': 'https://api-chocmaster.falavinhanext.tec.br/api/v1/notas-fiscais-cigam',
+  '003': 'https://api-chocmaster.falavinhanext.tec.br/api/v1/notas-fiscais-cigam',
   '004': 'https://api-chocmaster-madalena.falavinhanext.tec.br/api/v1/notas-fiscais-cigam',
 };
 
@@ -99,6 +103,30 @@ export class CigamNfeRoutingService {
   }
 
   /**
+   * Verifica se a unidade informada é atendida localmente por esta instância
+   */
+  isUnidadeLocal(unidade: string): boolean {
+    const localUnit = this.obterUnidadeLocal();
+    if (unidade === localUnit) {
+      return true;
+    }
+
+    // Suporte a lista explícita de unidades atendidas por esta instância (ex: CIGAM_LOCAL_UNIDADES=001,002,003)
+    if (process.env.CIGAM_LOCAL_UNIDADES) {
+      const units = process.env.CIGAM_LOCAL_UNIDADES.split(',').map((u) => u.trim().padStart(3, '0'));
+      return units.includes(unidade);
+    }
+
+    // Fallback padrão: se esta instância for a Matriz (001), ela atende 001, 002 e 003
+    // que pertencem ao mesmo grupo Miranda e Vieira Ltda
+    if (localUnit === '001' && ['001', '002', '003'].includes(unidade)) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
    * Obtém a URL de destino para onde a nota de determinada unidade deve ser encaminhada
    */
   obterUrlDestino(unidade: string): string | null {
@@ -145,10 +173,10 @@ export class CigamNfeRoutingService {
       };
     }
 
-    // Se pertence a esta mesma unidade local, processa localmente
-    if (info.unidade === localUnit) {
+    // Se a unidade pertence a esta instância local (ex.: 001, 002 ou 003 na Matriz), processa localmente
+    if (this.isUnidadeLocal(info.unidade)) {
       logger.info(
-        `[ROTEADOR NF-E CIGAM] NF-e pertence à unidade local ${localUnit} (${info.nomeEmpresa || 'Matriz'}). Processando localmente.`
+        `[ROTEADOR NF-E CIGAM] NF-e pertence à unidade atendida localmente ${info.unidade} (${info.nomeEmpresa || 'Miranda e Vieira'}). Processando localmente.`
       );
       return {
         forwarded: false,

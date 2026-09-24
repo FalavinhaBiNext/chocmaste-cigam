@@ -31,25 +31,58 @@ describe('CigamNfeRoutingService', () => {
   });
 
   describe('identificarUnidadeNegocio', () => {
-    it('deve identificar unidade 004 para CNPJ da Madalena Pet Store', () => {
+    it('deve identificar unidade 004 para CNPJ da MADALENA', () => {
       const xml = '<emit><CNPJ>42817349000160</CNPJ></emit>';
       const result = service.identificarUnidadeNegocio({ xmlContent: xml });
       expect(result.unidade).toBe('004');
       expect(result.cnpj).toBe('42817349000160');
-      expect(result.nomeEmpresa).toBe('Madalena Pet Store');
+      expect(result.nomeEmpresa).toBe('MADALENA');
     });
 
-    it('deve identificar unidade 001 para CNPJ da Chocmaster Matriz', () => {
+    it('deve identificar unidade 001 para CNPJ da MIRANDA E VIEIRA (E-COMMERCE)', () => {
       const xml = '<emit><CNPJ>10330589000140</CNPJ></emit>';
       const result = service.identificarUnidadeNegocio({ xmlContent: xml });
       expect(result.unidade).toBe('001');
       expect(result.cnpj).toBe('10330589000140');
-      expect(result.nomeEmpresa).toBe('Chocmaster Matriz');
+      expect(result.nomeEmpresa).toBe('MIRANDA E VIEIRA LTDA (E-COMMERCE)');
+    });
+
+    it('deve identificar unidade 002 para CNPJ da MIRANDA E VIEIRA (INDUSTRIA)', () => {
+      const xml = '<emit><CNPJ>10330589000492</CNPJ></emit>';
+      const result = service.identificarUnidadeNegocio({ xmlContent: xml });
+      expect(result.unidade).toBe('002');
+      expect(result.cnpj).toBe('10330589000492');
+      expect(result.nomeEmpresa).toBe('MIRANDA E VIEIRA LTDA (INDUSTRIA)');
+    });
+
+    it('deve identificar unidade 003 para CNPJ da MIRANDA E VIEIRA (ML FULL)', () => {
+      const xml = '<emit><CNPJ>10330589000301</CNPJ></emit>';
+      const result = service.identificarUnidadeNegocio({ xmlContent: xml });
+      expect(result.unidade).toBe('003');
+      expect(result.cnpj).toBe('10330589000301');
+      expect(result.nomeEmpresa).toBe('MIRANDA E VIEIRA LTDA (ML FULL)');
     });
 
     it('deve usar o campo unidadeNegocio do body quando CNPJ não for identificado', () => {
       const result = service.identificarUnidadeNegocio({ unidadeNegocio: '004' });
       expect(result.unidade).toBe('004');
+    });
+  });
+
+  describe('isUnidadeLocal', () => {
+    it('na Matriz (001), 001, 002 e 003 devem ser consideradas locais', () => {
+      expect(service.isUnidadeLocal('001')).toBe(true);
+      expect(service.isUnidadeLocal('002')).toBe(true);
+      expect(service.isUnidadeLocal('003')).toBe(true);
+      expect(service.isUnidadeLocal('004')).toBe(false);
+    });
+
+    it('na Madalena (004), apenas 004 deve ser considerada local', () => {
+      process.env.CIGAM_DEFAULT_UNIDADE_NEGOCIO = '004';
+      const madalenaService = new CigamNfeRoutingService();
+      expect(madalenaService.isUnidadeLocal('004')).toBe(true);
+      expect(madalenaService.isUnidadeLocal('001')).toBe(false);
+      expect(madalenaService.isUnidadeLocal('002')).toBe(false);
     });
   });
 
