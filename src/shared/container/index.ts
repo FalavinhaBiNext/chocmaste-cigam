@@ -200,9 +200,11 @@ container.registerSingleton(MercadoLivreShippingLabelService);
 
 import { NotasFiscaisCigamRepository } from '@/modules/notasFiscaisCigam/repositories/notasFiscaisCigamRepository';
 import { NotasFiscaisCigamService } from '@/modules/notasFiscaisCigam/services/notasFiscaisCigamService';
+import { CigamNfeRoutingService } from '@/modules/notasFiscaisCigam/services/cigamNfeRoutingService';
 import { NotasFiscaisCigamController } from '@/modules/notasFiscaisCigam/controllers/notasFiscaisCigamController';
 
 container.registerSingleton(NotasFiscaisCigamRepository);
+container.registerSingleton(CigamNfeRoutingService);
 container.registerSingleton(NotasFiscaisCigamService);
 container.registerSingleton(NotasFiscaisCigamController);
 

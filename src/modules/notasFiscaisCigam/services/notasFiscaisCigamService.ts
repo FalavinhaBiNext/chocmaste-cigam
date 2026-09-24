@@ -4,6 +4,7 @@ import { PedidoService } from '@/modules/pedido/services/pedidoService';
 import { MercadoLivreFiscalService } from '@/modules/mercadoLivre/services/mercadoLivreFiscalService';
 import { ShopeeFiscalService } from '@/modules/shopee/services/shopeeFiscalService';
 import { TrayFiscalService } from '@/modules/tray/services/trayFiscalService';
+import { CigamNfeRoutingService } from './cigamNfeRoutingService';
 import { ReceberNotaFiscalInput } from '../notasFiscaisCigam.validator';
 import { ResponseNotaFiscalCigamDTO } from '../dto';
 import { logger } from '@/shared/utils/logger';
@@ -23,6 +24,8 @@ export class NotasFiscaisCigamService {
     private readonly shopeeFiscalService: ShopeeFiscalService,
     @inject(TrayFiscalService)
     private readonly trayFiscalService: TrayFiscalService,
+    @inject(CigamNfeRoutingService)
+    private readonly cigamNfeRoutingService: CigamNfeRoutingService,
   ) {}
 
   async receberNotaFiscal(input: ReceberNotaFiscalInput): Promise<ResponseNotaFiscalCigamDTO> {
@@ -156,6 +159,47 @@ export class NotasFiscaisCigamService {
       return { success: false, message: 'Esta NF-e já foi enviada ao marketplace.' };
     }
 
+    // Se a nota pertence a outra unidade de negócio, tenta encaminhar para a API correspondente
+    const localUnit = this.cigamNfeRoutingService.obterUnidadeLocal();
+    const infoNota = this.cigamNfeRoutingService.identificarUnidadeNegocio({
+      unidadeNegocio: nota.unidade_negocio || undefined,
+      xmlContent: nota.xml_content,
+      chaveAcesso: nota.chave_acesso || undefined,
+    });
+
+    if (infoNota.unidade !== localUnit) {
+      const targetUrl = this.cigamNfeRoutingService.obterUrlDestino(infoNota.unidade);
+      if (targetUrl) {
+        logger.info(
+          `[NF-E CIGAM] NF-e ${nota.id} (pedido CIGAM #${nota.numero_pedido_cigam}) pertence à unidade ${infoNota.unidade} (${infoNota.nomeEmpresa || 'Outra Empresa'}). Encaminhando para ${targetUrl}...`
+        );
+        try {
+          await this.cigamNfeRoutingService.encaminharRequisicao(targetUrl, nota.xml_content, {
+            numeroPedido: nota.numero_pedido_cigam,
+            unidadeNegocio: infoNota.unidade,
+            dataFaturamento: nota.data_faturamento ? new Date(nota.data_faturamento).toISOString().split('T')[0] : undefined,
+            numeroNf: nota.numero_nf || undefined,
+            serieNf: nota.serie_nf || undefined,
+            chaveAcessoNfe: nota.chave_acesso || undefined,
+          });
+
+          await this.notasFiscaisCigamRepository.updateEnviadoMarketplace(nota.id, true);
+          return {
+            success: true,
+            message: `NF-e encaminhada com sucesso para o sistema da unidade ${infoNota.unidade} (${infoNota.nomeEmpresa || 'Outra Empresa'}).`,
+          };
+        } catch (forwardErr: any) {
+          logger.error(
+            `[NF-E CIGAM] Erro ao encaminhar nota ${nota.id} para unidade ${infoNota.unidade}: ${forwardErr.message}`
+          );
+          return {
+            success: false,
+            message: `Erro ao encaminhar NF-e para a unidade ${infoNota.unidade}: ${forwardErr.message}`,
+          };
+        }
+      }
+    }
+
     if (!nota.marketplace) {
       return { success: false, message: 'Esta NF-e não está vinculada a um pedido de marketplace.' };
     }
@@ -251,6 +295,84 @@ export class NotasFiscaisCigamService {
     }
 
     return this.enviarParaMarketplace(nota.id);
+  }
+
+  /**
+   * Identifica todas as notas não enviadas que pertencem a outra unidade de negócio
+   * e as encaminha para a API de destino correspondente.
+   */
+  async reencaminharNotasOutraUnidade(): Promise<{
+    totalEncontradas: number;
+    encaminhadas: number;
+    falhas: number;
+    detalhes: Array<{ id: string; pedido: string; unidade: string; sucesso: boolean; mensagem?: string }>;
+  }> {
+    const localUnit = this.cigamNfeRoutingService.obterUnidadeLocal();
+    const notas = await this.notasFiscaisCigamRepository.findNotEnviadas();
+
+    const detalhes: Array<{ id: string; pedido: string; unidade: string; sucesso: boolean; mensagem?: string }> = [];
+    let encaminhadas = 0;
+    let falhas = 0;
+
+    for (const nota of notas) {
+      const info = this.cigamNfeRoutingService.identificarUnidadeNegocio({
+        unidadeNegocio: nota.unidade_negocio || undefined,
+        xmlContent: nota.xml_content,
+        chaveAcesso: nota.chave_acesso || undefined,
+      });
+
+      if (info.unidade !== localUnit) {
+        const targetUrl = this.cigamNfeRoutingService.obterUrlDestino(info.unidade);
+        if (!targetUrl) {
+          detalhes.push({
+            id: nota.id,
+            pedido: nota.numero_pedido_cigam,
+            unidade: info.unidade,
+            sucesso: false,
+            mensagem: `Sem URL de destino para unidade ${info.unidade}`,
+          });
+          falhas++;
+          continue;
+        }
+
+        try {
+          await this.cigamNfeRoutingService.encaminharRequisicao(targetUrl, nota.xml_content, {
+            numeroPedido: nota.numero_pedido_cigam,
+            unidadeNegocio: info.unidade,
+            dataFaturamento: nota.data_faturamento ? new Date(nota.data_faturamento).toISOString().split('T')[0] : undefined,
+            numeroNf: nota.numero_nf || undefined,
+            serieNf: nota.serie_nf || undefined,
+            chaveAcessoNfe: nota.chave_acesso || undefined,
+          });
+
+          await this.notasFiscaisCigamRepository.updateEnviadoMarketplace(nota.id, true);
+          encaminhadas++;
+          detalhes.push({
+            id: nota.id,
+            pedido: nota.numero_pedido_cigam,
+            unidade: info.unidade,
+            sucesso: true,
+            mensagem: `Encaminhado para ${targetUrl}`,
+          });
+        } catch (err: any) {
+          falhas++;
+          detalhes.push({
+            id: nota.id,
+            pedido: nota.numero_pedido_cigam,
+            unidade: info.unidade,
+            sucesso: false,
+            mensagem: err.message,
+          });
+        }
+      }
+    }
+
+    return {
+      totalEncontradas: detalhes.length,
+      encaminhadas,
+      falhas,
+      detalhes,
+    };
   }
 
   async deleteById(id: string): Promise<void> {

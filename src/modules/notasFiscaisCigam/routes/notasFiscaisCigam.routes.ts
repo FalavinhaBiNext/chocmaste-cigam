@@ -16,6 +16,7 @@ export function createNotasFiscaisCigamRoutes(
   router.get('/nao-enviadas', asyncHandler(controller.listarNotEnviadas));
   router.get('/:id', asyncHandler(controller.buscarPorId));
   router.patch('/:id/enviar', asyncHandler(controller.marcarEnviada));
+  router.post('/reencaminhar-outra-unidade', asyncHandler(controller.reencaminharOutraUnidade));
   router.post('/:id/enviar-marketplace', asyncHandler(controller.enviarParaMarketplace));
   router.post('/por-pedido-cigam/:numeroPedidoCigam/enviar-marketplace', asyncHandler(controller.enviarParaMarketplacePorPedido));
   router.delete('/:id', asyncHandler(controller.excluirNota));

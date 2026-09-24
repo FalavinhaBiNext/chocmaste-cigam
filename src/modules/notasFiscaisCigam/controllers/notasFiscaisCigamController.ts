@@ -1,6 +1,7 @@
 import { injectable, inject } from 'tsyringe';
 import { Request, Response } from 'express';
 import { NotasFiscaisCigamService } from '../services/notasFiscaisCigamService';
+import { CigamNfeRoutingService } from '../services/cigamNfeRoutingService';
 import { validateReceberNotaFiscalBody } from '../notasFiscaisCigam.validator';
 import { logger } from '@/shared/utils/logger';
 import { ValidationError } from '@/shared/errors/AppError';
@@ -9,7 +10,9 @@ import { ValidationError } from '@/shared/errors/AppError';
 export class NotasFiscaisCigamController {
   constructor(
     @inject(NotasFiscaisCigamService)
-    private readonly notasFiscaisCigamService: NotasFiscaisCigamService
+    private readonly notasFiscaisCigamService: NotasFiscaisCigamService,
+    @inject(CigamNfeRoutingService)
+    private readonly cigamNfeRoutingService: CigamNfeRoutingService
   ) {}
 
   receberWebhook = async (req: Request, res: Response): Promise<void> => {
@@ -25,6 +28,28 @@ export class NotasFiscaisCigamController {
 
     // Validar campos do body
     const bodyData = validateReceberNotaFiscalBody(req.body);
+
+    // Verificar se a NF-e pertence a outra unidade de negócio e deve ser roteada
+    const routingResult = await this.cigamNfeRoutingService.verificarERotear({
+      body: bodyData,
+      xmlContent,
+      headers: req.headers,
+    });
+
+    if (routingResult.forwarded) {
+      logger.success(
+        `[NF-E CIGAM] NF-e encaminhada com sucesso para a unidade ${routingResult.unidadeIdentificada}`
+      );
+      res.status(201).json(
+        routingResult.response || {
+          success: true,
+          message: `NF-e recebida e roteada com sucesso para a unidade ${routingResult.unidadeIdentificada}.`,
+          forwarded: true,
+          target_unit: routingResult.unidadeIdentificada,
+        }
+      );
+      return;
+    }
 
     // Combinar dados do body com o conteúdo do XML
     const input = {
@@ -116,6 +141,16 @@ export class NotasFiscaisCigamController {
     res.status(resultado.success ? 200 : 400).json({
       success: resultado.success,
       message: resultado.message,
+    });
+  }
+
+  reencaminharOutraUnidade = async (_req: Request, res: Response): Promise<void> => {
+    const resultado = await this.notasFiscaisCigamService.reencaminharNotasOutraUnidade();
+
+    res.status(200).json({
+      success: true,
+      message: `${resultado.encaminhadas} nota(s) encaminhada(s) com sucesso.`,
+      data: resultado,
     });
   }
 }
