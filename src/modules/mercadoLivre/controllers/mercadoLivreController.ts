@@ -292,13 +292,11 @@ export class MercadoLivreController {
     logger.info(`[ML SHIPMENT] ===== Iniciando verificação de shipment para pedido #${orderId} =====`);
 
     try {
-      // 1. Buscar pedido no ML para obter shipment_id
-      logger.info(`[ML SHIPMENT] Passo 1: Buscando pedido #${orderId} na API do Mercado Livre...`);
-      const orderData: any = await this.httpClient.get(`/orders/${orderId}`);
-      logger.info(`[ML SHIPMENT] Pedido #${orderId} recebido do ML. Keys: ${Object.keys(orderData).join(', ')}`);
-
-      const shipmentId = orderData.shipping?.id ? String(orderData.shipping.id) : null;
-      logger.info(`[ML SHIPMENT] Campo 'shipping' do pedido: ${JSON.stringify(orderData.shipping)}`);
+      // 1. Buscar pedido ou pacote no ML para obter shipment_id
+      logger.info(`[ML SHIPMENT] Passo 1: Buscando pedido/pacote #${orderId} na API do Mercado Livre...`);
+      const resolved = await this.httpClient.getOrderOrPack(String(orderId));
+      const shipmentId = resolved.shipmentId;
+      logger.info(`[ML SHIPMENT] Identificador #${orderId} resolvido como ${resolved.type}. Shipment: ${shipmentId}`);
 
       if (!shipmentId) {
         logger.warn(`[ML SHIPMENT] Pedido #${orderId} não possui shipping_id no ML.`);

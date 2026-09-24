@@ -82,16 +82,16 @@ export class MercadoLivreFiscalService {
     logger.info(`[ML FISCAL] Pedido ${pedido.id} sem shipping_id em cache. Buscando no ML via numero_loja=${pedido.numero_loja}...`);
 
     try {
-      const orderData: any = await this.httpClient.get(`/orders/${pedido.numero_loja}`);
-      const shipmentId = orderData.shipping?.id ? String(orderData.shipping.id) : null;
+      const resolved = await this.httpClient.getOrderOrPack(pedido.numero_loja);
+      const shipmentId = resolved.shipmentId;
 
       if (!shipmentId) {
-        logger.warn(`[ML FISCAL] Pedido ML #${pedido.numero_loja} não possui shipping_id no ML.`);
+        logger.warn(`[ML FISCAL] Pedido/Pacote ML #${pedido.numero_loja} não possui shipping_id no ML.`);
         return { success: false, error: 'Pedido não possui shipments no Mercado Livre.' };
       }
 
       await this.pedidoService.update(pedido.id, { shipping_id: shipmentId });
-      logger.info(`[ML FISCAL] shipping_id ${shipmentId} salvo no pedido ${pedido.id}`);
+      logger.info(`[ML FISCAL] shipping_id ${shipmentId} salvo no pedido ${pedido.id} (tipo: ${resolved.type})`);
 
       return { success: true, shipmentId };
     } catch (error: any) {
@@ -133,6 +133,22 @@ export class MercadoLivreFiscalService {
           ? ' ATENÇÃO: CEPs divergentes — é isso que vai causar o erro "wrong_receiver_zipcode" no envio.'
           : '')
       );
+
+      // Se a NF-e já foi processada anteriormente e a etiqueta já está pronta ou impressa, ou despachada
+      const jaProcessadoNoMl =
+        (status === 'ready_to_ship' && (substatus === 'ready_to_print' || substatus === 'printed')) ||
+        status === 'shipped' ||
+        status === 'delivered';
+
+      if (jaProcessadoNoMl) {
+        logger.success(
+          `[ML FISCAL] NF-e já foi aceita e processada no Mercado Livre para o shipment ${shipmentId} (Status: ${status}/${substatus}). Marcando como enviada.`
+        );
+        return {
+          success: true,
+          shipmentId,
+        };
+      }
 
       if (status !== 'ready_to_ship' || substatus !== 'invoice_pending') {
         logger.warn(

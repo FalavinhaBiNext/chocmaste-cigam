@@ -103,4 +103,63 @@ export class MercadoLivreHttpClient {
       throw new Error(`Erro na API Mercado Livre [${error.response?.status}]: ${message}`);
     }
   }
+
+  /**
+   * Busca um pedido individual (/orders/:id) ou pacote/carrinho (/packs/:id).
+   * No Mercado Livre, quando o cliente compra mais de um item ou pelo carrinho,
+   * o identificador recebido é o pack_id. Se buscar em /orders/:id dá 404,
+   * mas em /packs/:id retorna os dados do pacote com o shipment.
+   */
+  async getOrderOrPack(id: string): Promise<{
+    type: 'order' | 'pack';
+    data: any;
+    shipmentId: string | null;
+    rawOrderId?: string;
+  }> {
+    // 1. Tenta buscar como Order simples
+    try {
+      const orderData: any = await this.get<any>(`/orders/${id}`);
+      const shipmentId = orderData.shipping?.id ? String(orderData.shipping.id) : null;
+      return {
+        type: 'order',
+        data: orderData,
+        shipmentId,
+        rawOrderId: orderData.id ? String(orderData.id) : id,
+      };
+    } catch (orderError: any) {
+      const is404 =
+        orderError.message?.includes('[404]') ||
+        orderError.message?.includes('not found') ||
+        orderError.message?.includes('Order do not exists');
+
+      if (is404) {
+        logger.info(
+          `[ML CLIENT] Identificador #${id} não encontrado em /orders. Tentando como pacote em /packs/${id}...`
+        );
+        try {
+          const packData: any = await this.get<any>(`/packs/${id}`);
+          const shipmentId = packData.shipment?.id ? String(packData.shipment.id) : null;
+          const firstOrderId =
+            packData.orders && packData.orders.length > 0 ? String(packData.orders[0].id) : undefined;
+
+          logger.info(
+            `[ML CLIENT] Pacote #${id} encontrado com sucesso! Shipment: ${shipmentId}, Pedido filho: ${firstOrderId}`
+          );
+
+          return {
+            type: 'pack',
+            data: packData,
+            shipmentId,
+            rawOrderId: firstOrderId,
+          };
+        } catch (packError: any) {
+          logger.error(
+            `[ML CLIENT] Identificador #${id} também não foi encontrado em /packs: ${packError.message}`
+          );
+          throw orderError;
+        }
+      }
+      throw orderError;
+    }
+  }
 }
