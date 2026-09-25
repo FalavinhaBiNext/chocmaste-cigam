@@ -277,4 +277,37 @@ export class TrayController {
 
     res.status(200).set('Content-Type', 'text/html; charset=utf-8').send(html);
   };
+
+  /**
+   * Lista o catálogo de status de pedidos da loja.
+   * GET /tray/orders/statuses
+   */
+  listOrderStatuses = async (_req: Request, res: Response) => {
+    const statuses = await this.orderService.listarStatus();
+
+    res.status(200).json({
+      success: true,
+      data: statuses,
+    });
+  };
+
+  /**
+   * Atualiza o status de um pedido na Tray.
+   * PUT /tray/orders/:orderId/status
+   */
+  updateOrderStatus = async (req: Request, res: Response) => {
+    const orderId = String(req.params.orderId);
+    const statusId = Number(req.body?.status_id);
+
+    if (!statusId || isNaN(statusId)) {
+      throw new ValidationError('Parâmetro status_id é obrigatório e deve ser numérico.');
+    }
+
+    const result = await this.orderService.atualizarStatusPedido(orderId, statusId);
+
+    res.status(200).json({
+      success: true,
+      data: result,
+    });
+  };
 }

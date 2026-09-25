@@ -54,4 +54,31 @@ export class TrayOrderService {
   async buscarPedidoCompleto(orderId: string): Promise<TrayCompleteOrder> {
     return this.httpClient.get<TrayCompleteOrder>(`/orders/${orderId}/complete`);
   }
+
+  /**
+   * Lista o catálogo de status de pedidos da loja.
+   * GET /orders/statuses
+   */
+  async listarStatus(params: { page?: number; limit?: number } = {}): Promise<any> {
+    logger.info('[TRAY] Listando catálogo de status de pedidos', params);
+    return this.httpClient.get<any>('/orders/statuses', {
+      params: {
+        page: params.page,
+        limit: params.limit || 50,
+      },
+    });
+  }
+
+  /**
+   * Atualiza o status de um pedido na Tray.
+   * PUT /orders/:id
+   */
+  async atualizarStatusPedido(orderId: string, statusId: number): Promise<any> {
+    logger.info(`[TRAY] Atualizando status do pedido ${orderId} para status_id=${statusId}`);
+    return this.httpClient.put<any>(`/orders/${orderId}`, {
+      Order: {
+        status_id: statusId,
+      },
+    });
+  }
 }

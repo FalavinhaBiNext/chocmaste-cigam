@@ -84,6 +84,24 @@ export class TrayFiscalService {
       });
 
       logger.success(`[TRAY FISCAL] NF-e registrada com sucesso no pedido Tray ${orderId}`);
+
+      const statusFaturadoId = process.env.TRAY_STATUS_FATURADO_ID;
+      if (statusFaturadoId) {
+        try {
+          const statusIdNum = parseInt(statusFaturadoId, 10);
+          if (!isNaN(statusIdNum) && statusIdNum > 0) {
+            await this.httpClient.put(`/orders/${orderId}`, {
+              Order: {
+                status_id: statusIdNum,
+              },
+            });
+            logger.success(`[TRAY FISCAL] Status do pedido Tray ${orderId} atualizado para status_id=${statusIdNum}`);
+          }
+        } catch (statusError: any) {
+          logger.warn(`[TRAY FISCAL] NF-e registrada, mas falha ao atualizar status do pedido Tray ${orderId}: ${statusError.message}`);
+        }
+      }
+
       return { success: true };
     } catch (error: any) {
       logger.error(`[TRAY FISCAL] Erro ao registrar NF-e no pedido Tray ${orderId}: ${error.message}`);

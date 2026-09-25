@@ -89,4 +89,49 @@ describe('TrayFiscalService', () => {
       },
     });
   });
+
+  it('deve atualizar o status do pedido se TRAY_STATUS_FATURADO_ID estiver configurado', async () => {
+    process.env.TRAY_STATUS_FATURADO_ID = '15';
+    mockHttpClient.put = vi.fn().mockResolvedValue({ message: 'Saved', id: 308901 });
+
+    const chave = '35260912345678000100550010000829571234567890';
+    const result = await fiscalService.enviarNFe('308901', {
+      numero: '82957',
+      serie: '1',
+      chaveAcesso: chave,
+      dataFaturamento: '2026-09-23',
+      valor: 100,
+    });
+
+    expect(result.success).toBe(true);
+    expect(mockHttpClient.post).toHaveBeenCalledWith('/orders/308901/invoices', expect.any(Object));
+    expect(mockHttpClient.put).toHaveBeenCalledWith('/orders/308901', {
+      Order: {
+        status_id: 15,
+      },
+    });
+
+    delete process.env.TRAY_STATUS_FATURADO_ID;
+  });
+
+  it('não deve quebrar o envio da NF-e se a atualização de status falhar', async () => {
+    process.env.TRAY_STATUS_FATURADO_ID = '15';
+    mockHttpClient.put = vi.fn().mockRejectedValue(new Error('Status inexistente'));
+
+    const chave = '35260912345678000100550010000829571234567890';
+    const result = await fiscalService.enviarNFe('308901', {
+      numero: '82957',
+      serie: '1',
+      chaveAcesso: chave,
+      dataFaturamento: '2026-09-23',
+      valor: 100,
+    });
+
+    expect(result.success).toBe(true);
+    expect(mockHttpClient.post).toHaveBeenCalled();
+    expect(mockHttpClient.put).toHaveBeenCalled();
+
+    delete process.env.TRAY_STATUS_FATURADO_ID;
+  });
 });
+
