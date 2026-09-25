@@ -121,13 +121,16 @@ async function run() {
         throw new Error(`Produto "${item.descricao}" (ID Bling: ${idProdutoBling}) não possui mapeamento De-Para para o CIGAM.`);
       }
 
+      const centroArmazenagem = process.env.CIGAM_DEFAULT_CENTRO_ARMAZENAGEM || '050';
       const payloadItem = {
         CodigoPedido: codigoPedidoCigam,
         CodigoMaterial: mapProduto.id_cigam,
         Quantidade: item.quantidade,
         ValorUnitario: item.valor,
         PrecoUnitario: item.valor,
-        ValorTotal: item.valorTotal || (item.valor * item.quantidade)
+        ValorTotal: item.valorTotal || (item.valor * item.quantidade),
+        CodigoCentroArmazenagem: centroArmazenagem,
+        CentroArmazenagem: centroArmazenagem,
       };
 
       console.log(`[LOG] Enviando item (Material CIGAM: ${mapProduto.id_cigam}) do Pedido CIGAM #${codigoPedidoCigam}...`);

@@ -153,6 +153,7 @@ export class CigamPedidoService {
     }
 
     // 7. Enviar os itens do pedido
+    const centroArmazenagem = process.env.CIGAM_DEFAULT_CENTRO_ARMAZENAGEM || '050';
     for (const item of itensMapeados) {
       const payloadItem = {
         CodigoPedido: codigoPedidoCigam,
@@ -160,7 +161,9 @@ export class CigamPedidoService {
         Quantidade: item.quantidade,
         ValorUnitario: item.valorUnitario,
         PrecoUnitario: item.valorUnitario,
-        ValorTotal: item.valorTotal
+        ValorTotal: item.valorTotal,
+        CodigoCentroArmazenagem: centroArmazenagem,
+        CentroArmazenagem: centroArmazenagem,
       };
 
       logger.info(`Adicionando item (Material CIGAM: ${item.idMaterialCigam}) ao pedido CIGAM #${codigoPedidoCigam}...`);
