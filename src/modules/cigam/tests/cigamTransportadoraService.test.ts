@@ -87,7 +87,7 @@ describe('CigamTransportadoraService', () => {
         Numero: '390',
         Municipio: 'UBERABA',
         Uf: 'MG',
-        Cep: '38041100',
+        Cep: '38041-100',
         Ativo: true,
       }),
     );

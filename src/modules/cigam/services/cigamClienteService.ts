@@ -8,6 +8,7 @@ import { CigamMunicipioService } from './cigamMunicipioService';
 import { CigamPessoaResponse } from './types';
 import { logger } from '@/shared/utils/logger';
 import { delay } from '@/shared/utils/delay';
+import { formatarCepCigam } from '@/shared/utils/cep';
 
 @injectable()
 export class CigamClienteService {
@@ -123,7 +124,7 @@ export class CigamClienteService {
         Uf: (clienteBling.uf || '').toUpperCase(),
         Telefone: clienteBling.telefone || clienteBling.celular || '',
         Email: (clienteBling.email || '').toUpperCase(),
-        Cep: clienteBling.cep ? clienteBling.cep.replace(/\D/g, '') : '',
+        Cep: formatarCepCigam(clienteBling.cep),
         Inscricao: clienteBling.ie || '',
         Inscrito: !!clienteBling.ie,
         UnidadeNegocio: unidadeNegocio || '',

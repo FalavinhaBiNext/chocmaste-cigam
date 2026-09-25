@@ -9,6 +9,7 @@ import { logger } from '@/shared/utils/logger';
 import { delay } from '@/shared/utils/delay';
 import { ContatosService } from '@/modules/bling/services/contatosService';
 import { CigamMunicipioService } from './cigamMunicipioService';
+import { formatarCepCigam } from '@/shared/utils/cep';
 
 @injectable()
 export class CigamTransportadoraService {
@@ -126,7 +127,7 @@ export class CigamTransportadoraService {
         Uf: uf,
         Telefone: transportadoraDetalhada.telefone || transportadoraDetalhada.celular || '',
         Email: (transportadoraDetalhada.email || '').trim().toUpperCase(),
-        Cep: (endereco?.cep || '').replace(/\D/g, ''),
+        Cep: formatarCepCigam(endereco?.cep),
         Ativo: transportadoraDetalhada.situacao === 'A' || transportadoraDetalhada.situacao === 'Ativo',
       };
 
