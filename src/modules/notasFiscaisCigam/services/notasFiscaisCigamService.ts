@@ -178,7 +178,7 @@ export class NotasFiscaisCigamService {
       chaveAcesso: nota.chave_acesso || undefined,
     });
 
-    if (infoNota.unidade !== localUnit) {
+    if (!this.cigamNfeRoutingService.isUnidadeLocal(infoNota.unidade)) {
       const targetUrl = this.cigamNfeRoutingService.obterUrlDestino(infoNota.unidade);
       if (targetUrl) {
         logger.info(
@@ -359,7 +359,7 @@ export class NotasFiscaisCigamService {
         chaveAcesso: nota.chave_acesso || undefined,
       });
 
-      if (info.unidade !== localUnit) {
+      if (!this.cigamNfeRoutingService.isUnidadeLocal(info.unidade)) {
         const targetUrl = this.cigamNfeRoutingService.obterUrlDestino(info.unidade);
         if (!targetUrl) {
           detalhes.push({

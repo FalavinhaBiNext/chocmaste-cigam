@@ -10,6 +10,8 @@ const PUBLIC_PATHS = [
     '/bling/callback',
     '/bling/webhook',
     '/tray/callback',
+    '/mercado-livre/callback',
+    '/shopee/callback',
     '/notas-fiscais-cigam',
 ];
 
