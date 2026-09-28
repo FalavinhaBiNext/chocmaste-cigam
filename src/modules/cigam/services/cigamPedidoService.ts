@@ -101,6 +101,7 @@ export class CigamPedidoService {
     const descontoValor = typeof pedidoBling.desconto === 'object' && pedidoBling.desconto !== null
       ? (pedidoBling.desconto.valor ?? 0)
       : (Number(pedidoBling.desconto) || 0);
+    const outrasDespesas = Number(pedidoBling.outrasDespesas) || 0;
 
     const partesObservacao: string[] = [`Bling Pedido #${pedidoBling.numero}`];
     if (pedidoBling.observacoes) {
@@ -111,6 +112,9 @@ export class CigamPedidoService {
     }
     if (valorFrete > 0) {
       partesObservacao.push(`Frete: ${valorFrete.toFixed(2).replace('.', ',')}`);
+    }
+    if (outrasDespesas > 0) {
+      partesObservacao.push(`Encargos: ${outrasDespesas.toFixed(2).replace('.', ',')}`);
     }
 
     const payloadCapa = {
@@ -251,17 +255,18 @@ export class CigamPedidoService {
     }
     const headersCigam = { 'X-Api-Key': hubPedidoApiKey };
 
-    logger.success(`Pedido CIGAM #${codigoPedidoCigam} encontrado (${itensPedidoCigam.length} item(ns)). Atualizando frete e desconto...`);
+    logger.success(`Pedido CIGAM #${codigoPedidoCigam} encontrado (${itensPedidoCigam.length} item(ns)). Atualizando frete, desconto e encargos...`);
     logger.info(`URL da requisição PATCH: ${urlPedidoCigam}`);
     logger.info(`X-Api-Key utilizada: ${hubPedidoApiKey.slice(0, 4)}...${hubPedidoApiKey.slice(-4)} (mascarada; ver observação abaixo)`);
     try {
       await axios.patch(urlPedidoCigam, {
         valorDesconto: descontoValor,
         valorFrete: valorFrete,
+        valorEncargos: outrasDespesas,
       }, { httpsAgent, headers: headersCigam });
     } catch (error: any) {
       logger.error(
-        `PATCH de frete/desconto falhou para o pedido CIGAM #${codigoPedidoCigam}: ` +
+        `PATCH de valores (frete/desconto/encargos) falhou para o pedido CIGAM #${codigoPedidoCigam}: ` +
         `status=${error.response?.status ?? 'sem status'} ` +
         `corpo=${JSON.stringify(error.response?.data) ?? 'sem corpo'}`
       );

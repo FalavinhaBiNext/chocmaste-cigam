@@ -60,6 +60,7 @@ export interface BlingPedidoDataDTO {
   situacao: BlingSituacaoDTO;
   itens: BlingItemDTO[];
   parcelas?: BlingParcelaDTO[];
+  outrasDespesas?: number; // valorEncargos cigam
 }
 
 export interface BlingPedidoResponse {
