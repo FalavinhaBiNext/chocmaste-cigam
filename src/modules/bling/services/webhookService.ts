@@ -139,6 +139,11 @@ export class WebhookService {
       }
     }
 
+    if (!unidadeNegocio && process.env.CIGAM_DEFAULT_UNIDADE_NEGOCIO) {
+      unidadeNegocio = process.env.CIGAM_DEFAULT_UNIDADE_NEGOCIO;
+      logger.webhook(`Unidade de negócio fallback para default configurado: ${unidadeNegocio}`);
+    }
+
     // Buscar codigo_conta a partir do canal de venda (loja)
     let codigoConta: string | undefined;
     const idLoja = String(data.loja.id);

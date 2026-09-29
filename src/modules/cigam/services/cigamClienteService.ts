@@ -127,7 +127,7 @@ export class CigamClienteService {
         Cep: formatarCepCigam(clienteBling.cep),
         Inscricao: clienteBling.ie || '',
         Inscrito: !!clienteBling.ie,
-        UnidadeNegocio: unidadeNegocio || '',
+        UnidadeNegocio: unidadeNegocio || process.env.CIGAM_DEFAULT_UNIDADE_NEGOCIO || '',
         Ativo: true,
         CodigoPais: '031'
       };
