@@ -218,4 +218,63 @@ describe('CigamPedidoService - Idempotência e Retomada', () => {
       expect.objectContaining({ CodigoPedido: 'CIGAM-EXISTENTE-123', CodigoMaterial: 'MAT-402' })
     );
   });
+
+  it('falha na capa quando CIGAM retorna success: false com HTTP 200 (não usa número do Bling como fallback)', async () => {
+    cigamHttpClient.post.mockResolvedValueOnce({
+      success: false,
+      messages: ['Condição de pagamento não permitida.'],
+      data: null,
+    });
+
+    await expect(
+      service.enviarPedido(mockPedidoBling, 'UN-01', undefined, null, 'event-uuid-1')
+    ).rejects.toThrow('CIGAM rejeitou a criação da capa do pedido #9876: Condição de pagamento não permitida.');
+
+    // NÃO deve atualizar o pedido nem o evento com o número do Bling
+    expect(pedidoService.update).not.toHaveBeenCalled();
+    expect(eventService.setEventCigamId).not.toHaveBeenCalled();
+  });
+
+  it('desconsidera código CIGAM registrado se for idêntico ao número do Bling e recria a capa', async () => {
+    cigamHttpClient.post.mockImplementation(async (_base: string, _env: string, path: string) => {
+      if (path === '/API/api/comercial/fa/Pedido/Salvar') {
+        return { success: true, data: { codigoPedido: '000298' } };
+      }
+      if (path === '/API/api/comercial/fa/Pedido/SalvarItemPedido') {
+        return { success: true };
+      }
+      return {};
+    });
+
+    cigamHttpClient.get.mockResolvedValue([
+      { CodigoMaterial: 'MAT-401' },
+      { CodigoMaterial: 'MAT-402' },
+    ]);
+
+    // Passa '9876' (número do Bling) como se fosse o código CIGAM existente
+    const result = await service.enviarPedido(mockPedidoBling, 'UN-01', undefined, '9876', 'event-uuid-1');
+
+    expect(result).toBe('000298');
+
+    // DEVE ter chamado a criação da capa
+    const chamadasPost = cigamHttpClient.post.mock.calls.map((c: any[]) => c[2]);
+    expect(chamadasPost).toContain('/API/api/comercial/fa/Pedido/Salvar');
+    expect(pedidoService.update).toHaveBeenCalledWith('local-ped-1', { numero_pedido_cigam: '000298' });
+  });
+
+  it('falha no item quando CIGAM retorna success: false no SalvarItemPedido', async () => {
+    cigamHttpClient.post.mockImplementation(async (_base: string, _env: string, path: string) => {
+      if (path === '/API/api/comercial/fa/Pedido/Salvar') {
+        return { success: true, data: { codigoPedido: '000299' } };
+      }
+      if (path === '/API/api/comercial/fa/Pedido/SalvarItemPedido') {
+        return { success: false, messages: ['Material sem saldo em estoque.'] };
+      }
+      return {};
+    });
+
+    await expect(
+      service.enviarPedido(mockPedidoBling, 'UN-01', undefined, null, 'event-uuid-1')
+    ).rejects.toThrow('Falha ao adicionar item (Material: MAT-401) no pedido CIGAM #000299: Material sem saldo em estoque.');
+  });
 });

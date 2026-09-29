@@ -58,6 +58,12 @@ export class CigamPedidoService {
       }
     }
 
+    // Se o código CIGAM for idêntico ao número do pedido Bling, trata-se de resquício de erro antigo (fallback indevido)
+    if (codigoPedidoCigam && String(codigoPedidoCigam).trim() === String(pedidoBling.numero).trim()) {
+      logger.warn(`Código CIGAM registrado (#${codigoPedidoCigam}) é idêntico ao número do pedido Bling (#${pedidoBling.numero}). Desconsiderando código espúrio para criar nova capa no CIGAM.`);
+      codigoPedidoCigam = null;
+    }
+
     // 1. Resolução do Cliente (obter ou criar dinamicamente)
     const idClienteBling = String(pedidoBling.contato.id);
     const idClienteCigam = (await this.cigamClienteService.obterOuCriarCliente(idClienteBling, unidadeNegocio)).trim();
@@ -128,6 +134,11 @@ export class CigamPedidoService {
         prazo = pedidoBling.data;
       }
 
+      let prazoProgramado = pedidoBling.dataPrevista;
+      if (!prazoProgramado || prazoProgramado === '0000-00-00') {
+        prazoProgramado = prazo;
+      }
+
       const partesObservacao: string[] = [`Bling Pedido #${pedidoBling.numero}`];
       if (pedidoBling.observacoes) {
         partesObservacao.push(pedidoBling.observacoes);
@@ -150,7 +161,7 @@ export class CigamPedidoService {
         Observacao: partesObservacao.join(' - ').toUpperCase(),
         CopiarObservacoesCliente: true,
         PrazoEntrega: prazo,
-        PrazoProgramado: pedidoBling.dataPrevista || prazo,
+        PrazoProgramado: prazoProgramado,
         OrigemPedido: 'Bling Integration',
         UnidadeNegocio: unidadeNegocio || process.env.CIGAM_DEFAULT_UNIDADE_NEGOCIO || '',
         ...(codigoConta ? { CodigoConta: codigoConta } : {}),
@@ -164,7 +175,25 @@ export class CigamPedidoService {
         payloadCapa
       );
 
-      codigoPedidoCigam = responseCapa?.data?.codigoPedido || responseCapa?.Codigo || responseCapa?.codigo || responseCapa?.id || String(pedidoBling.numero);
+      // CIGAM retorna HTTP 200 com { success: false, messages: [...] } em caso de falha de validação/regra de negócio
+      if (responseCapa && responseCapa.success === false) {
+        const erros = Array.isArray(responseCapa.messages) ? responseCapa.messages.join(' | ') : (responseCapa.message || 'Erro na API do CIGAM');
+        throw new Error(`CIGAM rejeitou a criação da capa do pedido #${pedidoBling.numero}: ${erros}`);
+      }
+
+      codigoPedidoCigam =
+        responseCapa?.data?.codigoPedido ||
+        responseCapa?.data?.Codigo ||
+        responseCapa?.CodigoPedido ||
+        responseCapa?.codigoPedido ||
+        responseCapa?.Codigo ||
+        responseCapa?.codigo;
+
+      if (!codigoPedidoCigam) {
+        const erros = Array.isArray(responseCapa?.messages) ? responseCapa.messages.join(' | ') : JSON.stringify(responseCapa);
+        throw new Error(`Não foi possível recuperar o código do pedido criado no CIGAM. Resposta: ${erros}`);
+      }
+
       const codigoSalvo = String(codigoPedidoCigam);
       logger.success(`Capa do pedido criada no CIGAM com sucesso. Código do pedido no CIGAM: ${codigoSalvo}`);
 
@@ -254,12 +283,19 @@ export class CigamPedidoService {
 
       logger.info(`Adicionando item (Material CIGAM: ${item.idMaterialCigam}) ao pedido CIGAM #${codigoPedidoCigam}...`);
       logger.info('Payload do item CIGAM', payloadItem);
-      await this.cigamHttpClient.post(
+      const responseItem: any = await this.cigamHttpClient.post(
         baseUrl,
         ambiente,
         '/API/api/comercial/fa/Pedido/SalvarItemPedido',
         payloadItem
       );
+
+      // CIGAM retorna HTTP 200 com { success: false, messages: [...] } em caso de erro no item
+      if (responseItem && responseItem.success === false) {
+        const erros = Array.isArray(responseItem.messages) ? responseItem.messages.join(' | ') : (responseItem.message || 'Erro ao adicionar item no CIGAM');
+        throw new Error(`Falha ao adicionar item (Material: ${item.idMaterialCigam}) no pedido CIGAM #${codigoPedidoCigam}: ${erros}`);
+      }
+
       await delay(200); // pequeno delay entre itens
     }
 
