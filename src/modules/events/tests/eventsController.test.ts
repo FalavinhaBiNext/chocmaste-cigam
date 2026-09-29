@@ -145,4 +145,41 @@ describe('EventController', () => {
     resolveFirst();
     try { await firstCall; } catch {}
   });
+
+  it('retryCigamSync prioriza unidade de negocio da loja do pedido Bling sobre company_id', async () => {
+    svc.findById.mockResolvedValue({
+      id: 'evt-retry-1',
+      cigam_sincronizado: false,
+      pedido_id: 74996,
+      company_id: 'tenant-matriz'
+    });
+    blingHttpClient.getPedido.mockResolvedValue({
+      data: {
+        id: 74996,
+        loja: {
+          id: 203345026,
+          unidadeNegocio: { id: 941369 }
+        }
+      }
+    });
+    deParaUnidadesNegocioRepo.findByCompanyIdBling.mockImplementation((id: string) => {
+      if (id === '941369') return Promise.resolve({ unidade_negocio: '002' });
+      if (id === 'tenant-matriz') return Promise.resolve({ unidade_negocio: '001' });
+      return Promise.resolve(null);
+    });
+    cigamPedidoService.enviarPedido.mockResolvedValue('CIGAM-002');
+
+    const req = mockReq({ params: { id: 'evt-retry-1' } }) as Request;
+    const res = mockRes() as Response;
+    await ctrl.retryCigamSync(req, res);
+
+    expect(cigamPedidoService.enviarPedido).toHaveBeenCalledWith(
+      expect.anything(),
+      '002',
+      undefined,
+      undefined,
+      'evt-retry-1'
+    );
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
 });

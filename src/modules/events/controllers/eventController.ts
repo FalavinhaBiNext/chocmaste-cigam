@@ -124,18 +124,36 @@ export class EventController {
 
             logger.info(`Iniciando retry CIGAM para evento ${eventId}, pedido Bling #${event.pedido_id}`)
 
-            // Buscar unidade de negócio a partir do company_id armazenado no evento
+            const pedidoCompleto = await this.blingHttpClient.getPedido(event.pedido_id)
+            const data: any = pedidoCompleto.data
+
+            // Resolução da unidade de negócio
             let unidadeNegocio: string | undefined;
-            if (event.company_id) {
-                const mapping = await this.deParaUnidadesNegocioRepo.findByCompanyIdBling(event.company_id);
-                if (mapping) {
-                    unidadeNegocio = mapping.unidade_negocio;
-                    logger.info(`Unidade de negócio mapeada no retry: ${event.company_id} -> ${unidadeNegocio}`);
+
+            // 1. Prioridade: Unidade de Negócio informada na loja do pedido Bling
+            const idUnidadeBling = data?.loja?.unidadeNegocio?.id ? String(data.loja.unidadeNegocio.id) : undefined;
+            if (idUnidadeBling) {
+                const mappingUnidade = await this.deParaUnidadesNegocioRepo.findByCompanyIdBling(idUnidadeBling);
+                if (mappingUnidade) {
+                    unidadeNegocio = mappingUnidade.unidade_negocio;
+                    logger.info(`Unidade de negócio mapeada no retry via pedido Bling: ${idUnidadeBling} -> ${unidadeNegocio}`);
                 }
             }
 
-            const pedidoCompleto = await this.blingHttpClient.getPedido(event.pedido_id)
-            const data: any = pedidoCompleto.data
+            // 2. Fallback: company_id do evento
+            if (!unidadeNegocio && event.company_id) {
+                const mapping = await this.deParaUnidadesNegocioRepo.findByCompanyIdBling(event.company_id);
+                if (mapping) {
+                    unidadeNegocio = mapping.unidade_negocio;
+                    logger.info(`Unidade de negócio mapeada no retry via company_id: ${event.company_id} -> ${unidadeNegocio}`);
+                }
+            }
+
+            // 3. Fallback final: default do ambiente
+            if (!unidadeNegocio && process.env.CIGAM_DEFAULT_UNIDADE_NEGOCIO) {
+                unidadeNegocio = process.env.CIGAM_DEFAULT_UNIDADE_NEGOCIO;
+                logger.info(`Unidade de negócio fallback no retry para default configurado: ${unidadeNegocio}`);
+            }
 
             try {
                 const cigamPedidoId = await this.cigamPedidoService.enviarPedido(
