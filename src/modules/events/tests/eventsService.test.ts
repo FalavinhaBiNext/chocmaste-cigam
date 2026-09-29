@@ -96,4 +96,11 @@ describe('EventService', () => {
       cigam_pedido_id: 'CIGAM-123',
     });
   });
+
+  it('setEventCigamId updates cigam_pedido_id immediately on event', async () => {
+    await svc.setEventCigamId('1', 'CIGAM-999');
+    expect(repo.updateSyncStatus).toHaveBeenCalledWith('1', {
+      cigam_pedido_id: 'CIGAM-999',
+    });
+  });
 });

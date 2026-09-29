@@ -15,13 +15,17 @@ function mockRes(): Partial<Response> {
 describe('EventController', () => {
   let ctrl: EventController;
   let svc: any;
+  let webhookSvc: any;
+  let blingHttpClient: any;
+  let cigamPedidoService: any;
+  let deParaUnidadesNegocioRepo: any;
 
   beforeEach(() => {
-    svc = { create: vi.fn(), findAll: vi.fn(), findById: vi.fn(), findByPedido: vi.fn(), findByNumeroPedido: vi.fn(), delete: vi.fn() };
-    const webhookSvc = {} as any;
-    const blingHttpClient = {} as any;
-    const cigamPedidoService = {} as any;
-    const deParaUnidadesNegocioRepo = {} as any;
+    svc = { create: vi.fn(), findAll: vi.fn(), findById: vi.fn(), findByPedido: vi.fn(), findByNumeroPedido: vi.fn(), delete: vi.fn(), markSyncSuccess: vi.fn(), markSyncFailure: vi.fn() };
+    webhookSvc = { processarPedidoCriado: vi.fn() };
+    blingHttpClient = { getPedido: vi.fn() };
+    cigamPedidoService = { enviarPedido: vi.fn() };
+    deParaUnidadesNegocioRepo = { findByCompanyIdBling: vi.fn() };
     ctrl = new EventController(svc as any, webhookSvc, blingHttpClient, cigamPedidoService, deParaUnidadesNegocioRepo);
   });
 
@@ -32,21 +36,23 @@ describe('EventController', () => {
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
-  it('create calls service and returns 201', async () => {
-    svc.create.mockResolvedValue({ id: 'uuid' });
+  it('create calls webhookService and returns 201', async () => {
+    webhookSvc.processarPedidoCriado = vi.fn().mockResolvedValue('CIGAM-1');
     const body = {
-      id: '550e8400-e29b-41d4-a716-446655440000',
+      eventId: '550e8400-e29b-41d4-a716-446655440000',
       event: 'order.created',
-      company_id: 'c1',
-      pedido_id: 123,
-      numero_pedido: 1001,
-      numero_loja: 'LOJA-001',
-      total_pedido: 250,
+      companyId: 'c1',
+      data: {
+        id: 123,
+        numero: 1001,
+        numeroLoja: 'LOJA-001',
+        total: 250,
+      }
     };
     const req = mockReq({ body }) as Request;
     const res = mockRes() as Response;
     await ctrl.create(req, res);
-    expect(svc.create).toHaveBeenCalled();
+    expect(webhookSvc.processarPedidoCriado).toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(201);
   });
 
@@ -94,5 +100,49 @@ describe('EventController', () => {
     const res = mockRes() as Response;
     await ctrl.findByNumeroPedido(req, res);
     expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  it('retryCigamSync returns 404 when event not found', async () => {
+    svc.findById.mockResolvedValue(null);
+    const req = mockReq({ params: { id: 'evt-404' } }) as Request;
+    const res = mockRes() as Response;
+    await ctrl.retryCigamSync(req, res);
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: false, message: 'Evento não encontrado.' }));
+  });
+
+  it('retryCigamSync returns 400 when event is already synchronized', async () => {
+    svc.findById.mockResolvedValue({ id: 'evt-1', cigam_sincronizado: true });
+    const req = mockReq({ params: { id: 'evt-1' } }) as Request;
+    const res = mockRes() as Response;
+    await ctrl.retryCigamSync(req, res);
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: false, message: 'Este pedido já foi sincronizado com o CIGAM.' }));
+  });
+
+  it('retryCigamSync returns 409 when concurrent retry for same event is in progress', async () => {
+    let resolveFirst: any;
+    const slowPromise = new Promise((resolve) => { resolveFirst = resolve; });
+    svc.findById.mockImplementation(async () => {
+      await slowPromise;
+      return { id: 'evt-lock', cigam_sincronizado: false, pedido_id: 123 };
+    });
+
+    const req1 = mockReq({ params: { id: 'evt-lock' } }) as Request;
+    const res1 = mockRes() as Response;
+    const firstCall = ctrl.retryCigamSync(req1, res1);
+
+    const req2 = mockReq({ params: { id: 'evt-lock' } }) as Request;
+    const res2 = mockRes() as Response;
+    await ctrl.retryCigamSync(req2, res2);
+
+    expect(res2.status).toHaveBeenCalledWith(409);
+    expect(res2.json).toHaveBeenCalledWith(expect.objectContaining({
+      success: false,
+      message: 'A sincronização deste evento já está em processamento.',
+    }));
+
+    resolveFirst();
+    try { await firstCall; } catch {}
   });
 });

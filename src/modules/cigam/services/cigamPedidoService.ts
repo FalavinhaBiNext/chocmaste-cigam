@@ -8,6 +8,7 @@ import { UsuarioCigamService } from '@/modules/usuarioCigam/services/usuarioCiga
 import { DeParaFormasPagamentoRepository } from '@/modules/depara/repositories/deparaFormasPagamentoRepository';
 import { DeParaProdutosRepository } from '@/modules/depara/repositories/deparaProdutosRepository';
 import { PedidoService } from '@/modules/pedido/services/pedidoService';
+import { EventService } from '@/modules/events/services/eventService';
 import { logger } from '@/shared/utils/logger';
 import { delay } from '@/shared/utils/delay';
 
@@ -21,6 +22,7 @@ export class CigamPedidoService {
     @inject(DeParaFormasPagamentoRepository) private readonly deParaFormasPagamentoRepo: DeParaFormasPagamentoRepository,
     @inject(DeParaProdutosRepository) private readonly deParaProdutosRepo: DeParaProdutosRepository,
     @inject(PedidoService) private readonly pedidoService: PedidoService,
+    @inject(EventService) private readonly eventService?: EventService,
   ) { }
 
   private async getActiveEnv(): Promise<string> {
@@ -32,8 +34,29 @@ export class CigamPedidoService {
     return ativo.ambiente;
   }
 
-  async enviarPedido(pedidoBling: any, unidadeNegocio?: string, codigoConta?: string): Promise<string> {
+  async enviarPedido(
+    pedidoBling: any,
+    unidadeNegocio?: string,
+    codigoConta?: string,
+    codigoPedidoCigamExistente?: string | null,
+    eventId?: string
+  ): Promise<string> {
     logger.info(`Iniciando integração do pedido Bling #${pedidoBling.numero} para o CIGAM...`);
+
+    // 0. Detecção de pedido CIGAM pré-existente (idempotência)
+    let codigoPedidoCigam = codigoPedidoCigamExistente ? String(codigoPedidoCigamExistente).trim() : null;
+
+    if (!codigoPedidoCigam && pedidoBling?.id) {
+      try {
+        const pedidoLocal = await this.pedidoService.findByIdBling(String(pedidoBling.id));
+        if (pedidoLocal?.numero_pedido_cigam) {
+          codigoPedidoCigam = String(pedidoLocal.numero_pedido_cigam).trim();
+          logger.info(`Pedido Bling #${pedidoBling.numero} já possui código CIGAM registrado no banco local: ${codigoPedidoCigam}`);
+        }
+      } catch (err: any) {
+        logger.warn(`Não foi possível verificar pedido local para o pedido Bling #${pedidoBling.numero}: ${err.message}`);
+      }
+    }
 
     // 1. Resolução do Cliente (obter ou criar dinamicamente)
     const idClienteBling = String(pedidoBling.contato.id);
@@ -87,78 +110,137 @@ export class CigamPedidoService {
     }
     const baseUrl = usuarioCigam.url_ambiente;
 
-    // 6. Montar o payload da Capa do Pedido
-    let prazo = pedidoBling.dataSaida || pedidoBling.data;
-    try {
-      if (new Date(prazo) < new Date(pedidoBling.data)) {
-        prazo = pedidoBling.data;
-      }
-    } catch {
-      prazo = pedidoBling.data;
-    }
-
+    // Dados de frete, desconto e encargos (utilizados na capa e no PATCH)
     const valorFrete = pedidoBling.transporte?.frete ?? 0;
     const descontoValor = typeof pedidoBling.desconto === 'object' && pedidoBling.desconto !== null
       ? (pedidoBling.desconto.valor ?? 0)
       : (Number(pedidoBling.desconto) || 0);
     const outrasDespesas = Number(pedidoBling.outrasDespesas) || 0;
 
-    const partesObservacao: string[] = [`Bling Pedido #${pedidoBling.numero}`];
-    if (pedidoBling.observacoes) {
-      partesObservacao.push(pedidoBling.observacoes);
-    }
-    if (descontoValor > 0) {
-      partesObservacao.push(`Desconto: ${descontoValor.toFixed(2).replace('.', ',')}`);
-    }
-    if (valorFrete > 0) {
-      partesObservacao.push(`Frete: ${valorFrete.toFixed(2).replace('.', ',')}`);
-    }
-    if (outrasDespesas > 0) {
-      partesObservacao.push(`Encargos: ${outrasDespesas.toFixed(2).replace('.', ',')}`);
+    // 6. Montar o payload da Capa do Pedido e criar apenas se não existir
+    if (!codigoPedidoCigam) {
+      let prazo = pedidoBling.dataSaida || pedidoBling.data;
+      try {
+        if (new Date(prazo) < new Date(pedidoBling.data)) {
+          prazo = pedidoBling.data;
+        }
+      } catch {
+        prazo = pedidoBling.data;
+      }
+
+      const partesObservacao: string[] = [`Bling Pedido #${pedidoBling.numero}`];
+      if (pedidoBling.observacoes) {
+        partesObservacao.push(pedidoBling.observacoes);
+      }
+      if (descontoValor > 0) {
+        partesObservacao.push(`Desconto: ${descontoValor.toFixed(2).replace('.', ',')}`);
+      }
+      if (valorFrete > 0) {
+        partesObservacao.push(`Frete: ${valorFrete.toFixed(2).replace('.', ',')}`);
+      }
+      if (outrasDespesas > 0) {
+        partesObservacao.push(`Encargos: ${outrasDespesas.toFixed(2).replace('.', ',')}`);
+      }
+
+      const payloadCapa = {
+        CodigoCliente: idClienteCigam,
+        DataPedido: pedidoBling.data,
+        CodigoCondicaoPagamento: idCondicaoPagamentoCigam,
+        CodigoTransportadora: idTransportadoraCigam,
+        Observacao: partesObservacao.join(' - ').toUpperCase(),
+        CopiarObservacoesCliente: true,
+        PrazoEntrega: prazo,
+        PrazoProgramado: pedidoBling.dataPrevista || prazo,
+        OrigemPedido: 'Bling Integration',
+        UnidadeNegocio: unidadeNegocio || process.env.CIGAM_DEFAULT_UNIDADE_NEGOCIO || '',
+        ...(codigoConta ? { CodigoConta: codigoConta } : {}),
+      };
+
+      logger.info(`Enviando capa do pedido #${pedidoBling.numero} para o CIGAM...`);
+      const responseCapa: any = await this.cigamHttpClient.post(
+        baseUrl,
+        ambiente,
+        '/API/api/comercial/fa/Pedido/Salvar',
+        payloadCapa
+      );
+
+      codigoPedidoCigam = responseCapa?.data?.codigoPedido || responseCapa?.Codigo || responseCapa?.codigo || responseCapa?.id || String(pedidoBling.numero);
+      const codigoSalvo = String(codigoPedidoCigam);
+      logger.success(`Capa do pedido criada no CIGAM com sucesso. Código do pedido no CIGAM: ${codigoSalvo}`);
+
+      try {
+        const pedidoLocal = await this.pedidoService.findByIdBling(String(pedidoBling.id));
+        await this.pedidoService.update(pedidoLocal.id, { numero_pedido_cigam: codigoSalvo });
+        logger.success(`Código do pedido CIGAM (${codigoSalvo}) salvo no pedido local (${pedidoLocal.id}) logo após a criação da capa.`);
+      } catch (error: any) {
+        logger.error(`Falha ao salvar numero_pedido_cigam no pedido local logo após a criação da capa: ${error.message}`);
+      }
+
+      if (this.eventService) {
+        try {
+          if (eventId) {
+            await this.eventService.setEventCigamId(eventId, codigoSalvo);
+          } else if (pedidoBling?.id) {
+            const ev = await this.eventService.findByPedido(Number(pedidoBling.id));
+            if (ev) {
+              await this.eventService.setEventCigamId(ev.id, codigoSalvo);
+            }
+          }
+        } catch (error: any) {
+          logger.error(`Falha ao salvar cigam_pedido_id no evento logo após a criação da capa: ${error.message}`);
+        }
+      }
+    } else {
+      logger.info(`Retomando pedido CIGAM #${codigoPedidoCigam} já existente (capa não será recriada)...`);
+      if (this.eventService && eventId) {
+        try {
+          await this.eventService.setEventCigamId(eventId, codigoPedidoCigam);
+        } catch (error: any) {
+          logger.error(`Falha ao atualizar cigam_pedido_id no evento durante retomada: ${error.message}`);
+        }
+      }
     }
 
-    const payloadCapa = {
-      CodigoCliente: idClienteCigam,
-      DataPedido: pedidoBling.data,
-      CodigoCondicaoPagamento: idCondicaoPagamentoCigam,
-      CodigoTransportadora: idTransportadoraCigam,
-      Observacao: partesObservacao.join(' - ').toUpperCase(),
-      CopiarObservacoesCliente: true,
-      PrazoEntrega: prazo,
-      PrazoProgramado: pedidoBling.dataPrevista || prazo,
-      OrigemPedido: 'Bling Integration',
-      // UnidadeNegocio: unidadeNegocio || '',
-      UnidadeNegocio: unidadeNegocio || process.env.CIGAM_DEFAULT_UNIDADE_NEGOCIO || '',
-      ...(codigoConta ? { CodigoConta: codigoConta } : {}),
-    };
+    // 7. Enviar os itens do pedido (com reconciliação se a capa já existia)
+    let itensParaEnviar = itensMapeados;
+    let itensJaPresentesNoCigam: any[] = [];
 
-    logger.info(`Enviando capa do pedido #${pedidoBling.numero} para o CIGAM...`);
-    const responseCapa: any = await this.cigamHttpClient.post(
-      baseUrl,
-      ambiente,
-      '/API/api/comercial/fa/Pedido/Salvar',
-      payloadCapa
-    );
+    if (codigoPedidoCigam) {
+      try {
+        const respItens: any = await this.cigamHttpClient.get(
+          baseUrl,
+          ambiente,
+          '/API/api/comercial/fa/Pedido/BuscarItensPedido',
+          { params: { codigoPedido: codigoPedidoCigam } }
+        );
+        itensJaPresentesNoCigam = Array.isArray(respItens) ? respItens : (respItens?.data ?? []);
 
-    // O CIGAM costuma retornar o código do pedido criado na propriedade 'data.codigoPedido'
-    let codigoPedidoCigam = responseCapa?.data?.codigoPedido || responseCapa?.Codigo || responseCapa?.codigo || responseCapa?.id || String(pedidoBling.numero);
-    logger.success(`Capa do pedido criada no CIGAM com sucesso. Código do pedido no CIGAM: ${codigoPedidoCigam}`);
+        if (itensJaPresentesNoCigam.length > 0) {
+          const codigosMateriaisExistentes = new Set(
+            itensJaPresentesNoCigam.map((it: any) =>
+              String(it.CodigoMaterial || it.codigoMaterial || it.Material || it.material || it.cd_material || it.CdMaterial || it.codigo || '').trim()
+            ).filter(Boolean)
+          );
 
-    // Salva o numero_pedido_cigam no pedido local imediatamente, antes de qualquer outra
-    // etapa (itens, verificação, frete/desconto). Assim, mesmo que uma etapa seguinte falhe
-    // por instabilidade do CIGAM, o pedido já criado não fica "órfão" no nosso sistema — a
-    // NF-e que chegar depois consegue se vincular por numero_pedido_cigam normalmente.
-    try {
-      const pedidoLocal = await this.pedidoService.findByIdBling(String(pedidoBling.id));
-      await this.pedidoService.update(pedidoLocal.id, { numero_pedido_cigam: codigoPedidoCigam });
-      logger.success(`Código do pedido CIGAM (${codigoPedidoCigam}) salvo no pedido local (${pedidoLocal.id}) logo após a criação da capa.`);
-    } catch (error: any) {
-      logger.error(`Falha ao salvar numero_pedido_cigam no pedido local logo após a criação da capa: ${error.message}`);
+          if (codigosMateriaisExistentes.size > 0) {
+            itensParaEnviar = itensMapeados.filter(
+              (item) => !codigosMateriaisExistentes.has(String(item.idMaterialCigam).trim())
+            );
+
+            if (itensParaEnviar.length === 0) {
+              logger.info(`Pedido CIGAM #${codigoPedidoCigam} já possui todos os ${itensMapeados.length} itens cadastrados. Pulando envio de itens.`);
+            } else {
+              logger.info(`Pedido CIGAM #${codigoPedidoCigam} já possui ${itensMapeados.length - itensParaEnviar.length} itens cadastrados. Enviando ${itensParaEnviar.length} item(ns) pendente(s)...`);
+            }
+          }
+        }
+      } catch (err: any) {
+        logger.warn(`Não foi possível pré-consultar itens existentes no CIGAM #${codigoPedidoCigam}: ${err.message}. Prosseguindo com envio dos itens.`);
+      }
     }
 
-    // 7. Enviar os itens do pedido
     const centroArmazenagem = process.env.CIGAM_DEFAULT_CENTRO_ARMAZENAGEM || '050';
-    for (const item of itensMapeados) {
+    for (const item of itensParaEnviar) {
       const payloadItem = {
         CodigoPedido: codigoPedidoCigam,
         CodigoMaterial: item.idMaterialCigam,
@@ -181,56 +263,54 @@ export class CigamPedidoService {
       await delay(200); // pequeno delay entre itens
     }
 
-    // 8. Aguardar processamento inicial do CIGAM antes da primeira verificação
-    logger.info('Aguardando 10 segundos para processamento do CIGAM...');
-    await delay(10000);
-
-    // 9. Verificar existência do pedido via API comercial (mesma autenticação do Salvar/
-    // SalvarItemPedido, mais confiável que o hub_pedido). BuscarItensPedido retorna []
-    // quando o pedido ainda não foi indexado — não é um erro HTTP, por isso repetimos
-    // a verificação em vez de desistir na primeira lista vazia.
+    // 8. Se todos os itens já estavam presentes e nenhum novo item precisou ser enviado, reaproveitamos os itens consultados
     const VERIFICACAO_MAX_TENTATIVAS = 5;
     const VERIFICACAO_INTERVALO_MS = 15000;
 
-    let itensPedidoCigam: any[] = [];
+    let itensPedidoCigam: any[] = (itensParaEnviar.length === 0 && itensJaPresentesNoCigam.length > 0)
+      ? itensJaPresentesNoCigam
+      : [];
     let erroVerificacao: any = null;
 
-    for (let tentativa = 1; tentativa <= VERIFICACAO_MAX_TENTATIVAS; tentativa++) {
-      logger.info(`Verificando existência do pedido CIGAM #${codigoPedidoCigam} via BuscarItensPedido (tentativa ${tentativa}/${VERIFICACAO_MAX_TENTATIVAS})...`);
+    if (itensPedidoCigam.length === 0) {
+      logger.info('Aguardando 10 segundos para processamento do CIGAM...');
+      await delay(10000);
 
-      try {
-        const resp: any = await this.cigamHttpClient.get(
-          baseUrl,
-          ambiente,
-          '/API/api/comercial/fa/Pedido/BuscarItensPedido',
-          { params: { codigoPedido: codigoPedidoCigam } }
-        );
-        itensPedidoCigam = Array.isArray(resp) ? resp : (resp?.data ?? []);
-        erroVerificacao = null;
+      for (let tentativa = 1; tentativa <= VERIFICACAO_MAX_TENTATIVAS; tentativa++) {
+        logger.info(`Verificando existência do pedido CIGAM #${codigoPedidoCigam} via BuscarItensPedido (tentativa ${tentativa}/${VERIFICACAO_MAX_TENTATIVAS})...`);
 
-        if (itensPedidoCigam.length > 0) {
-          break;
+        try {
+          const resp: any = await this.cigamHttpClient.get(
+            baseUrl,
+            ambiente,
+            '/API/api/comercial/fa/Pedido/BuscarItensPedido',
+            { params: { codigoPedido: codigoPedidoCigam } }
+          );
+          itensPedidoCigam = Array.isArray(resp) ? resp : (resp?.data ?? []);
+          erroVerificacao = null;
+
+          if (itensPedidoCigam.length > 0) {
+            break;
+          }
+        } catch (error: any) {
+          erroVerificacao = error;
         }
-      } catch (error: any) {
-        erroVerificacao = error;
-      }
 
-      const ehUltimaTentativa = tentativa === VERIFICACAO_MAX_TENTATIVAS;
-      if (ehUltimaTentativa) {
-        // Só loga como erro de verdade depois de esgotar todas as tentativas —
-        // falhas/listas vazias nas tentativas anteriores são esperadas (atraso de indexação).
-        logger.error(
-          `Todas as ${VERIFICACAO_MAX_TENTATIVAS} tentativas de verificar o pedido CIGAM #${codigoPedidoCigam} via BuscarItensPedido falharam. ` +
-          (erroVerificacao ? `Última falha: ${erroVerificacao.message}` : 'BuscarItensPedido retornou lista vazia em todas as tentativas.')
-        );
-      } else {
-        logger.warn(
-          `Tentativa ${tentativa}/${VERIFICACAO_MAX_TENTATIVAS}: pedido CIGAM #${codigoPedidoCigam} ainda não encontrado ` +
-          (erroVerificacao ? `(erro: ${erroVerificacao.message})` : '(BuscarItensPedido retornou [])') +
-          '. Tentando novamente...'
-        );
-        logger.info(`Aguardando ${VERIFICACAO_INTERVALO_MS / 1000}s antes da próxima tentativa...`);
-        await delay(VERIFICACAO_INTERVALO_MS);
+        const ehUltimaTentativa = tentativa === VERIFICACAO_MAX_TENTATIVAS;
+        if (ehUltimaTentativa) {
+          logger.error(
+            `Todas as ${VERIFICACAO_MAX_TENTATIVAS} tentativas de verificar o pedido CIGAM #${codigoPedidoCigam} via BuscarItensPedido falharam. ` +
+            (erroVerificacao ? `Última falha: ${erroVerificacao.message}` : 'BuscarItensPedido retornou lista vazia em todas as tentativas.')
+          );
+        } else {
+          logger.warn(
+            `Tentativa ${tentativa}/${VERIFICACAO_MAX_TENTATIVAS}: pedido CIGAM #${codigoPedidoCigam} ainda não encontrado ` +
+            (erroVerificacao ? `(erro: ${erroVerificacao.message})` : '(BuscarItensPedido retornou [])') +
+            '. Tentando novamente...'
+          );
+          logger.info(`Aguardando ${VERIFICACAO_INTERVALO_MS / 1000}s antes da próxima tentativa...`);
+          await delay(VERIFICACAO_INTERVALO_MS);
+        }
       }
     }
 
@@ -274,6 +354,6 @@ export class CigamPedidoService {
     }
 
     logger.success(`Pedido Bling #${pedidoBling.numero} integrado ao CIGAM com sucesso!`);
-    return codigoPedidoCigam;
+    return String(codigoPedidoCigam);
   }
 }

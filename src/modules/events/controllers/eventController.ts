@@ -10,6 +10,8 @@ import { logger } from "@/shared/utils/logger";
 
 @injectable()
 export class EventController {
+    private readonly activeRetries = new Set<string>();
+
     constructor(
         private readonly eventService: EventService,
         private readonly webhookService: WebhookService,
@@ -89,59 +91,81 @@ export class EventController {
 
     retryCigamSync = async (req: Request, res: Response) => {
         const { id } = req.params
-        const event = await this.eventService.findById(String(id))
+        const eventId = String(id)
 
-        if (!event) {
-            res.status(404).json({
+        if (this.activeRetries.has(eventId)) {
+            res.status(409).json({
                 success: false,
-                message: 'Evento não encontrado.'
+                message: 'A sincronização deste evento já está em processamento.'
             })
             return
         }
 
-        if (event.cigam_sincronizado) {
-            res.status(400).json({
-                success: false,
-                message: 'Este pedido já foi sincronizado com o CIGAM.'
-            })
-            return
-        }
-
-        logger.info(`Iniciando retry CIGAM para evento ${id}, pedido Bling #${event.pedido_id}`)
-
-        // Buscar unidade de negócio a partir do company_id armazenado no evento
-        let unidadeNegocio: string | undefined;
-        if (event.company_id) {
-            const mapping = await this.deParaUnidadesNegocioRepo.findByCompanyIdBling(event.company_id);
-            if (mapping) {
-                unidadeNegocio = mapping.unidade_negocio;
-                logger.info(`Unidade de negócio mapeada no retry: ${event.company_id} -> ${unidadeNegocio}`);
-            }
-        }
-
-        const pedidoCompleto = await this.blingHttpClient.getPedido(event.pedido_id)
-        const data: any = pedidoCompleto.data
+        this.activeRetries.add(eventId)
 
         try {
-            const cigamPedidoId = await this.cigamPedidoService.enviarPedido(data, unidadeNegocio)
+            const event = await this.eventService.findById(eventId)
 
-            await this.eventService.markSyncSuccess(event.id, cigamPedidoId)
+            if (!event) {
+                res.status(404).json({
+                    success: false,
+                    message: 'Evento não encontrado.'
+                })
+                return
+            }
 
-            logger.success(`Retry CIGAM concluído para evento ${id}, código CIGAM: ${cigamPedidoId}`)
+            if (event.cigam_sincronizado) {
+                res.status(400).json({
+                    success: false,
+                    message: 'Este pedido já foi sincronizado com o CIGAM.'
+                })
+                return
+            }
 
-            res.status(200).json({
-                success: true,
-                message: 'Pedido sincronizado com o CIGAM com sucesso.',
-                data: {
-                    cigamPedidoId
+            logger.info(`Iniciando retry CIGAM para evento ${eventId}, pedido Bling #${event.pedido_id}`)
+
+            // Buscar unidade de negócio a partir do company_id armazenado no evento
+            let unidadeNegocio: string | undefined;
+            if (event.company_id) {
+                const mapping = await this.deParaUnidadesNegocioRepo.findByCompanyIdBling(event.company_id);
+                if (mapping) {
+                    unidadeNegocio = mapping.unidade_negocio;
+                    logger.info(`Unidade de negócio mapeada no retry: ${event.company_id} -> ${unidadeNegocio}`);
                 }
-            })
-        } catch (cigamError: any) {
-            const detalheResposta = cigamError.response?.data
-                ? ` | resposta CIGAM: ${JSON.stringify(cigamError.response.data)}`
-                : ''
-            await this.eventService.markSyncFailure(event.id, `${cigamError.message}${detalheResposta}`)
-            throw cigamError
+            }
+
+            const pedidoCompleto = await this.blingHttpClient.getPedido(event.pedido_id)
+            const data: any = pedidoCompleto.data
+
+            try {
+                const cigamPedidoId = await this.cigamPedidoService.enviarPedido(
+                    data,
+                    unidadeNegocio,
+                    undefined,
+                    event.cigam_pedido_id,
+                    event.id
+                )
+
+                await this.eventService.markSyncSuccess(event.id, cigamPedidoId)
+
+                logger.success(`Retry CIGAM concluído para evento ${eventId}, código CIGAM: ${cigamPedidoId}`)
+
+                res.status(200).json({
+                    success: true,
+                    message: 'Pedido sincronizado com o CIGAM com sucesso.',
+                    data: {
+                        cigamPedidoId
+                    }
+                })
+            } catch (cigamError: any) {
+                const detalheResposta = cigamError.response?.data
+                    ? ` | resposta CIGAM: ${JSON.stringify(cigamError.response.data)}`
+                    : ''
+                await this.eventService.markSyncFailure(event.id, `${cigamError.message}${detalheResposta}`)
+                throw cigamError
+            }
+        } finally {
+            this.activeRetries.delete(eventId)
         }
     }
 

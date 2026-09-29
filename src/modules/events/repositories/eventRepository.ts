@@ -69,7 +69,7 @@ export class EventRepository implements IEventRepository {
     }
 
     async updateSyncStatus(id: string, data: {
-        sync_status: 'pendente' | 'sincronizado' | 'falha';
+        sync_status?: 'pendente' | 'sincronizado' | 'falha';
         error_message?: string | null;
         retry_count?: number;
         cigam_sincronizado?: boolean;

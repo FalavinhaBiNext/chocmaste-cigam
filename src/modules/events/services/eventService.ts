@@ -85,6 +85,13 @@ export class EventService {
         logger.success(`Evento ${id} atualizado: cigam_sincronizado=${cigamSincronizado}`)
     }
 
+    async setEventCigamId(eventId: string, cigamPedidoId: string): Promise<void>{
+        await this.eventRepository.updateSyncStatus(eventId, {
+            cigam_pedido_id: cigamPedidoId,
+        });
+        logger.info(`Evento ${eventId} teve cigam_pedido_id atualizado para: ${cigamPedidoId}`);
+    }
+
     /**
      * Marca a integração do pedido com o CIGAM como falha, preservando o motivo
      * do erro e incrementando o contador de tentativas — em vez de só logar.

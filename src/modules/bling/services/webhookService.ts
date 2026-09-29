@@ -262,7 +262,13 @@ export class WebhookService {
       logger.webhook('Envio automático para CIGAM está desativado. Pulando integração.', { eventId: payload.eventId });
     } else {
       try {
-        cigamPedidoId = await this.cigamPedidoService.enviarPedido(data, unidadeNegocio, codigoConta);
+        cigamPedidoId = await this.cigamPedidoService.enviarPedido(
+          data,
+          unidadeNegocio,
+          codigoConta,
+          pedido.numero_pedido_cigam,
+          eventoCriado.id
+        );
         logger.webhook('Pedido enviado e integrado com sucesso no CIGAM', { eventId: payload.eventId });
 
         if (cigamPedidoId) {
