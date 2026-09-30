@@ -87,16 +87,23 @@ export class TrayFiscalService {
   }
 
   /**
-   * Loga o payload exato enviado no PUT de atualização da NF-e. O xml_danfe é
-   * substituído por um placeholder com o tamanho, pra não inflar o log com o
-   * XML inteiro (o conteúdo já é logado separadamente por logEnvioXml).
+   * Loga o payload exato enviado à Tray (criação ou atualização da NF-e). O
+   * xml_danfe é substituído por um placeholder com o tamanho, pra não inflar
+   * o log com o XML inteiro (o conteúdo já é logado separadamente por logEnvioXml).
    */
-  private logPayloadAtualizacao(orderId: string, invoiceId: string, orderInvoice: Record<string, unknown>): void {
+  private logPayload(rota: string, orderInvoice: Record<string, unknown>): void {
     const payloadParaLog = { ...orderInvoice };
     if (typeof payloadParaLog.xml_danfe === 'string') {
       payloadParaLog.xml_danfe = `<xml omitido, ${payloadParaLog.xml_danfe.length} caracteres>`;
     }
-    logger.info(`[TRAY FISCAL] Payload PUT /orders/${orderId}/invoices/${invoiceId}: ${JSON.stringify(payloadParaLog)}`);
+    logger.info(`[TRAY FISCAL] Payload enviado — ${rota}: ${JSON.stringify(payloadParaLog)}`);
+  }
+
+  /**
+   * Loga a resposta bruta devolvida pela Tray após enviar/atualizar a NF-e.
+   */
+  private logRetornoTray(rota: string, resposta: unknown): void {
+    logger.info(`[TRAY FISCAL] Retorno da Tray — ${rota}: ${JSON.stringify(resposta)}`);
   }
 
   /**
@@ -114,13 +121,16 @@ export class TrayFiscalService {
     }
 
     const orderInvoice = this.montarOrderInvoice(nota);
+    const rotaEnvio = `POST /orders/${orderId}/invoices`;
     this.logEnvioXml(orderId, nota);
+    this.logPayload(rotaEnvio, orderInvoice);
 
     try {
       const resposta = await this.httpClient.post<{ id?: string | number }>(`/orders/${orderId}/invoices`, {
         OrderInvoice: orderInvoice,
       });
 
+      this.logRetornoTray(rotaEnvio, resposta);
       logger.success(`[TRAY FISCAL] NF-e registrada com sucesso no pedido Tray ${orderId}`);
 
       const statusFaturadoId = process.env.TRAY_STATUS_FATURADO_ID;
@@ -192,12 +202,14 @@ export class TrayFiscalService {
     }
 
     const orderInvoice = this.montarOrderInvoice(nota);
+    const rotaAtualizacao = `PUT /orders/${orderId}/invoices/${invoiceId}`;
     this.logEnvioXml(orderId, nota);
-    this.logPayloadAtualizacao(orderId, invoiceId, orderInvoice);
+    this.logPayload(rotaAtualizacao, orderInvoice);
 
     try {
-      await this.httpClient.put(`/orders/${orderId}/invoices/${invoiceId}`, orderInvoice);
+      const resposta = await this.httpClient.put(`/orders/${orderId}/invoices/${invoiceId}`, orderInvoice);
 
+      this.logRetornoTray(rotaAtualizacao, resposta);
       logger.success(`[TRAY FISCAL] NF-e ${invoiceId} atualizada com sucesso no pedido Tray ${orderId}`);
       return { success: true, invoiceId };
     } catch (error: any) {
