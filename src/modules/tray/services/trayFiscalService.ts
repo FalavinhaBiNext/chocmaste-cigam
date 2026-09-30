@@ -76,6 +76,17 @@ export class TrayFiscalService {
   }
 
   /**
+   * Loga se o XML da NF-e foi incluído como xml_danfe no payload enviado à Tray.
+   */
+  private logEnvioXml(orderId: string, nota: NotaFiscalTrayInput): void {
+    if (nota.xml) {
+      logger.info(`[TRAY FISCAL] XML da NF-e incluído no payload (xml_danfe) do pedido ${orderId} — ${nota.xml.length} caracteres`);
+    } else {
+      logger.warn(`[TRAY FISCAL] Nenhum XML disponível para anexar como xml_danfe na NF-e do pedido ${orderId}`);
+    }
+  }
+
+  /**
    * Registra a NF-e no pedido Tray via POST /orders/:order_id/invoices.
    * A Tray espera o wrapper OrderInvoice com: number, serie, issue_date (YYYY-MM-DD),
    * key (44 dígitos) e value (numérico).
@@ -168,6 +179,7 @@ export class TrayFiscalService {
     }
 
     const orderInvoice = this.montarOrderInvoice(nota);
+    this.logEnvioXml(orderId, nota);
 
     try {
       await this.httpClient.put(`/orders/${orderId}/invoices/${invoiceId}`, orderInvoice);
