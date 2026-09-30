@@ -87,6 +87,19 @@ export class TrayFiscalService {
   }
 
   /**
+   * Loga o payload exato enviado no PUT de atualização da NF-e. O xml_danfe é
+   * substituído por um placeholder com o tamanho, pra não inflar o log com o
+   * XML inteiro (o conteúdo já é logado separadamente por logEnvioXml).
+   */
+  private logPayloadAtualizacao(orderId: string, invoiceId: string, orderInvoice: Record<string, unknown>): void {
+    const payloadParaLog = { ...orderInvoice };
+    if (typeof payloadParaLog.xml_danfe === 'string') {
+      payloadParaLog.xml_danfe = `<xml omitido, ${payloadParaLog.xml_danfe.length} caracteres>`;
+    }
+    logger.info(`[TRAY FISCAL] Payload PUT /orders/${orderId}/invoices/${invoiceId}: ${JSON.stringify(payloadParaLog)}`);
+  }
+
+  /**
    * Registra a NF-e no pedido Tray via POST /orders/:order_id/invoices.
    * A Tray espera o wrapper OrderInvoice com: number, serie, issue_date (YYYY-MM-DD),
    * key (44 dígitos) e value (numérico).
@@ -180,6 +193,7 @@ export class TrayFiscalService {
 
     const orderInvoice = this.montarOrderInvoice(nota);
     this.logEnvioXml(orderId, nota);
+    this.logPayloadAtualizacao(orderId, invoiceId, orderInvoice);
 
     try {
       await this.httpClient.put(`/orders/${orderId}/invoices/${invoiceId}`, orderInvoice);
