@@ -188,13 +188,11 @@ describe('TrayFiscalService.atualizarNFe', () => {
     expect(result.success).toBe(true);
     expect(result.invoiceId).toBe('500');
     expect(mockHttpClient.put).toHaveBeenCalledWith('/orders/308901/invoices/500', {
-      OrderInvoice: {
-        number: '82957',
-        serie: '1',
-        issue_date: '2026-09-23',
-        key: chave,
-        value: 250.75,
-      },
+      number: '82957',
+      serie: '1',
+      issue_date: '2026-09-23',
+      key: chave,
+      value: 250.75,
     });
   });
 
@@ -262,13 +260,11 @@ describe('TrayFiscalService — atualização automática 10s após o envio', ()
     await vi.advanceTimersByTimeAsync(10_000);
 
     expect(mockHttpClient.put).toHaveBeenCalledWith('/orders/308901/invoices/123', {
-      OrderInvoice: {
-        number: '82957',
-        serie: '1',
-        issue_date: '2026-09-23',
-        key: chave,
-        value: 199.9,
-      },
+      number: '82957',
+      serie: '1',
+      issue_date: '2026-09-23',
+      key: chave,
+      value: 199.9,
     });
   });
 

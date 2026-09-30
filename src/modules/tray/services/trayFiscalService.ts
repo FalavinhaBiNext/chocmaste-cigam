@@ -153,6 +153,9 @@ export class TrayFiscalService {
   /**
    * Atualiza uma NF-e já registrada no pedido Tray via PUT /orders/:order_id/invoices/:invoice_id.
    * Requer o invoiceId retornado pela Tray no momento do cadastro (enviarNFe).
+   * Diferente do POST de criação, a doc da Tray para esse PUT mostra os campos
+   * direto na raiz do body (sem o wrapper OrderInvoice) — e na prática a Tray
+   * rejeita o wrapper aqui com "Invalid parameter id.", então enviamos sem ele.
    */
   async atualizarNFe(orderId: string, invoiceId: string, nota: NotaFiscalTrayInput): Promise<EnviarNFeTrayResult> {
     logger.info(`[TRAY FISCAL] Iniciando atualização da NF-e ${invoiceId} do pedido ${orderId}`);
@@ -166,9 +169,7 @@ export class TrayFiscalService {
     const orderInvoice = this.montarOrderInvoice(nota);
 
     try {
-      await this.httpClient.put(`/orders/${orderId}/invoices/${invoiceId}`, {
-        OrderInvoice: orderInvoice,
-      });
+      await this.httpClient.put(`/orders/${orderId}/invoices/${invoiceId}`, orderInvoice);
 
       logger.success(`[TRAY FISCAL] NF-e ${invoiceId} atualizada com sucesso no pedido Tray ${orderId}`);
       return { success: true, invoiceId };
