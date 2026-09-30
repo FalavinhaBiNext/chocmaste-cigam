@@ -325,6 +325,66 @@ export class NotasFiscaisCigamService {
   }
 
   /**
+   * Reenvia os dados fiscais já salvos localmente para a Tray via PUT
+   * /orders/:order_id/invoices/:invoice_id — usado pelo botão "Atualizar na Tray"
+   * da tela de NF-e, para reforçar/corrigir os dados já registrados (ex.: quando o
+   * valor chegou em branco na Tray). Só se aplica a notas já enviadas via Tray
+   * (ou seja, não Shopee/Mercado Livre) e que tenham um tray_invoice_id salvo.
+   */
+  async atualizarNaTray(id: string): Promise<{ success: boolean; message: string }> {
+    const nota = await this.notasFiscaisCigamRepository.findById(id);
+    if (!nota) {
+      throw new NotFoundError(`Nota fiscal com ID: ${id} não encontrada`);
+    }
+
+    if (!nota.enviado_marketplace) {
+      return { success: false, message: 'Esta NF-e ainda não foi enviada ao marketplace. Envie antes de atualizar.' };
+    }
+
+    if (nota.marketplace === 'shopee' || nota.marketplace === 'mercado_livre') {
+      return { success: false, message: 'Atualização manual disponível apenas para NF-e enviadas via Tray.' };
+    }
+
+    if (!nota.numero_pedido_marketplace) {
+      return { success: false, message: 'NF-e sem número de pedido do marketplace vinculado.' };
+    }
+
+    if (!nota.tray_invoice_id) {
+      return {
+        success: false,
+        message: 'Esta NF-e não tem um invoice_id da Tray salvo (foi enviada antes desse controle existir). Não é possível atualizar.',
+      };
+    }
+
+    let valorPedido: number | undefined;
+    try {
+      const pedidoVinculado = await this.pedidoService.findByNumeroPedidoCigam(nota.numero_pedido_cigam);
+      if (pedidoVinculado?.total_venda) {
+        valorPedido = Number(pedidoVinculado.total_venda);
+      }
+    } catch {
+      // Ignora se não localizar o pedido vinculado
+    }
+
+    const resultado = await this.trayFiscalService.atualizarNFe(nota.numero_pedido_marketplace, nota.tray_invoice_id, {
+      numero: nota.numero_nf,
+      serie: nota.serie_nf,
+      chaveAcesso: nota.chave_acesso,
+      dataFaturamento: nota.data_faturamento,
+      valor: valorPedido,
+      xml: nota.xml_content,
+    });
+
+    if (!resultado.success) {
+      logger.warn(`[NF-E CIGAM] Atualização manual da nota ${nota.id} na Tray falhou: ${resultado.error}`);
+      return { success: false, message: resultado.error || 'Falha ao atualizar a NF-e na Tray.' };
+    }
+
+    logger.success(`[NF-E CIGAM] NF-e ${nota.id} atualizada manualmente com sucesso na Tray.`);
+    return { success: true, message: 'Dados fiscais atualizados com sucesso na Tray.' };
+  }
+
+  /**
    * Mesma lógica de enviarParaMarketplace, mas localizando a nota a partir do
    * numero_pedido_cigam — usado pelo botão "Enviar XML" na tela de Pedidos, que só
    * tem os dados do pedido local (não o id da nota fiscal).

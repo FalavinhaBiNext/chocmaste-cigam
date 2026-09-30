@@ -90,6 +90,7 @@ export class TrayFiscalService {
     }
 
     const orderInvoice = this.montarOrderInvoice(nota);
+    this.logEnvioXml(orderId, nota);
 
     try {
       const resposta = await this.httpClient.post<{ id?: string | number }>(`/orders/${orderId}/invoices`, {

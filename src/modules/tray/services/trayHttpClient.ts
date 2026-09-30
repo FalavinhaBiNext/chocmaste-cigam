@@ -69,11 +69,14 @@ export class TrayHttpClient {
 
     const cleanAddress = apiAddress.replace(/^https?:\/\//, '').replace(/\/+$/, '');
     const cleanUrl = url.startsWith('/') ? url : `/${url}`;
+    const fullUrl = `https://${cleanAddress}${cleanUrl}`;
+
+    logger.api(`Chamando ${method} ${fullUrl}`);
 
     try {
       const response = await axios.request<T>({
         method,
-        url: `https://${cleanAddress}${cleanUrl}`,
+        url: fullUrl,
         data,
         ...config,
         params: { ...config?.params, access_token: accessToken },
@@ -88,9 +91,11 @@ export class TrayHttpClient {
         logger.auth(`Token Tray rejeitado (error_code=${errorCode || 'n/a'}). Tentando renovar...`);
         try {
           const refreshed = await this.authService.refreshAccessToken();
+          const retryUrl = `https://${refreshed.api_address}${url}`;
+          logger.api(`Repetindo ${method} ${retryUrl} após renovar token`);
           const retryResponse = await axios.request<T>({
             method,
-            url: `https://${refreshed.api_address}${url}`,
+            url: retryUrl,
             data,
             ...config,
             params: { ...config?.params, access_token: refreshed.access_token },

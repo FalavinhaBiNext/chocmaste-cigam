@@ -133,6 +133,17 @@ export class NotasFiscaisCigamController {
     });
   }
 
+  atualizarNaTray = async (req: Request, res: Response): Promise<void> => {
+    const id = String(req.params.id);
+
+    const resultado = await this.notasFiscaisCigamService.atualizarNaTray(id);
+
+    res.status(resultado.success ? 200 : 400).json({
+      success: resultado.success,
+      message: resultado.message,
+    });
+  }
+
   enviarParaMarketplacePorPedido = async (req: Request, res: Response): Promise<void> => {
     const numeroPedidoCigam = String(req.params.numeroPedidoCigam);
 
