@@ -242,7 +242,7 @@ export class NotasFiscaisCigamService {
       nota.marketplace = marketplace;
     }
 
-    let resultado: { success: boolean; error?: string };
+    let resultado: { success: boolean; error?: string; invoiceId?: string };
 
     if (nota.marketplace === 'shopee') {
       if (!nota.numero_pedido_marketplace) {
@@ -302,6 +302,14 @@ export class NotasFiscaisCigamService {
     }
 
     await this.notasFiscaisCigamRepository.updateEnviadoMarketplace(nota.id, true);
+
+    if (resultado.invoiceId) {
+      try {
+        await this.notasFiscaisCigamRepository.updateTrayInvoiceId(nota.id, resultado.invoiceId);
+      } catch (error: any) {
+        logger.warn(`[NF-E CIGAM] Falha ao salvar tray_invoice_id da nota ${nota.id}: ${error.message}`);
+      }
+    }
 
     try {
       const pedidoVinculado = await this.pedidoService.findByNumeroPedidoCigam(nota.numero_pedido_cigam);

@@ -5,7 +5,10 @@ import { logger } from '@/shared/utils/logger';
 export interface EnviarNFeTrayResult {
   success: boolean;
   error?: string;
+  invoiceId?: string;
 }
+
+const ATRASO_ATUALIZACAO_NFE_MS = 10_000;
 
 export interface NotaFiscalTrayInput {
   numero: string | null;
@@ -45,6 +48,33 @@ export class TrayFiscalService {
     return cleaned;
   }
 
+  private validarNota(nota: NotaFiscalTrayInput): string | null {
+    if (!nota.chaveAcesso || nota.chaveAcesso.length !== 44) {
+      return 'A nota fiscal recebida do CIGAM não tem uma chave de acesso válida (44 dígitos), necessária para registrar a NF-e na Tray.';
+    }
+    if (!nota.numero || !nota.serie || !nota.dataFaturamento) {
+      return 'A nota fiscal recebida do CIGAM está sem número, série ou data de faturamento — campos obrigatórios para a Tray.';
+    }
+    return null;
+  }
+
+  private montarOrderInvoice(nota: NotaFiscalTrayInput): Record<string, unknown> {
+    const valorFinal = Number(nota.valor) || this.extrairValorXml(nota.xml) || 0;
+    const issueDate = this.formatarData(nota.dataFaturamento);
+
+    const orderInvoice: Record<string, unknown> = {
+      number: String(nota.numero).trim(),
+      serie: String(nota.serie).trim(),
+      issue_date: issueDate,
+      key: String(nota.chaveAcesso).trim(),
+      value: Number(valorFinal.toFixed(2)),
+    };
+    if (nota.xml) {
+      orderInvoice.xml_danfe = nota.xml;
+    }
+    return orderInvoice;
+  }
+
   /**
    * Registra a NF-e no pedido Tray via POST /orders/:order_id/invoices.
    * A Tray espera o wrapper OrderInvoice com: number, serie, issue_date (YYYY-MM-DD),
@@ -53,34 +83,17 @@ export class TrayFiscalService {
   async enviarNFe(orderId: string, nota: NotaFiscalTrayInput): Promise<EnviarNFeTrayResult> {
     logger.info(`[TRAY FISCAL] Iniciando registro de NF-e para pedido ${orderId}`);
 
-    if (!nota.chaveAcesso || nota.chaveAcesso.length !== 44) {
-      logger.warn(`[TRAY FISCAL] NF-e do pedido ${orderId} sem chave de acesso válida (44 dígitos). Envio abortado.`);
-      return {
-        success: false,
-        error: 'A nota fiscal recebida do CIGAM não tem uma chave de acesso válida (44 dígitos), necessária para registrar a NF-e na Tray.',
-      };
+    const erroValidacao = this.validarNota(nota);
+    if (erroValidacao) {
+      logger.warn(`[TRAY FISCAL] NF-e do pedido ${orderId} inválida: ${erroValidacao}`);
+      return { success: false, error: erroValidacao };
     }
 
-    if (!nota.numero || !nota.serie || !nota.dataFaturamento) {
-      logger.warn(`[TRAY FISCAL] NF-e do pedido ${orderId} sem número, série ou data de faturamento.`);
-      return {
-        success: false,
-        error: 'A nota fiscal recebida do CIGAM está sem número, série ou data de faturamento — campos obrigatórios para a Tray.',
-      };
-    }
-
-    const valorFinal = Number(nota.valor) || this.extrairValorXml(nota.xml) || 0;
-    const issueDate = this.formatarData(nota.dataFaturamento);
+    const orderInvoice = this.montarOrderInvoice(nota);
 
     try {
-      await this.httpClient.post(`/orders/${orderId}/invoices`, {
-        OrderInvoice: {
-          number: String(nota.numero).trim(),
-          serie: String(nota.serie).trim(),
-          issue_date: issueDate,
-          key: String(nota.chaveAcesso).trim(),
-          value: Number(valorFinal.toFixed(2)),
-        },
+      const resposta = await this.httpClient.post<{ id?: string | number }>(`/orders/${orderId}/invoices`, {
+        OrderInvoice: orderInvoice,
       });
 
       logger.success(`[TRAY FISCAL] NF-e registrada com sucesso no pedido Tray ${orderId}`);
@@ -102,9 +115,65 @@ export class TrayFiscalService {
         }
       }
 
-      return { success: true };
+      const invoiceId = resposta?.id !== undefined ? String(resposta.id) : undefined;
+      if (invoiceId) {
+        this.agendarAtualizacaoNFe(orderId, invoiceId, nota);
+      }
+
+      return { success: true, invoiceId };
     } catch (error: any) {
       logger.error(`[TRAY FISCAL] Erro ao registrar NF-e no pedido Tray ${orderId}: ${error.message}`);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Agenda uma chamada de atualizarNFe (PUT) com os mesmos dados enviados no
+   * registro, 10 segundos após o POST bem-sucedido. O timer é "unref"ado para
+   * não segurar o processo Node vivo (ex.: em testes ou durante um shutdown).
+   */
+  private agendarAtualizacaoNFe(orderId: string, invoiceId: string, nota: NotaFiscalTrayInput): void {
+    const timer = setTimeout(() => {
+      this.atualizarNFe(orderId, invoiceId, nota)
+        .then((resultado) => {
+          if (!resultado.success) {
+            logger.warn(`[TRAY FISCAL] Atualização automática da NF-e ${invoiceId} do pedido ${orderId} falhou: ${resultado.error}`);
+          }
+        })
+        .catch((error: any) => {
+          logger.error(`[TRAY FISCAL] Erro inesperado na atualização automática da NF-e ${invoiceId} do pedido ${orderId}: ${error.message}`);
+        });
+    }, ATRASO_ATUALIZACAO_NFE_MS);
+
+    if (typeof timer.unref === 'function') {
+      timer.unref();
+    }
+  }
+
+  /**
+   * Atualiza uma NF-e já registrada no pedido Tray via PUT /orders/:order_id/invoices/:invoice_id.
+   * Requer o invoiceId retornado pela Tray no momento do cadastro (enviarNFe).
+   */
+  async atualizarNFe(orderId: string, invoiceId: string, nota: NotaFiscalTrayInput): Promise<EnviarNFeTrayResult> {
+    logger.info(`[TRAY FISCAL] Iniciando atualização da NF-e ${invoiceId} do pedido ${orderId}`);
+
+    const erroValidacao = this.validarNota(nota);
+    if (erroValidacao) {
+      logger.warn(`[TRAY FISCAL] Atualização da NF-e ${invoiceId} do pedido ${orderId} abortada: ${erroValidacao}`);
+      return { success: false, error: erroValidacao };
+    }
+
+    const orderInvoice = this.montarOrderInvoice(nota);
+
+    try {
+      await this.httpClient.put(`/orders/${orderId}/invoices/${invoiceId}`, {
+        OrderInvoice: orderInvoice,
+      });
+
+      logger.success(`[TRAY FISCAL] NF-e ${invoiceId} atualizada com sucesso no pedido Tray ${orderId}`);
+      return { success: true, invoiceId };
+    } catch (error: any) {
+      logger.error(`[TRAY FISCAL] Erro ao atualizar NF-e ${invoiceId} no pedido Tray ${orderId}: ${error.message}`);
       return { success: false, error: error.message };
     }
   }

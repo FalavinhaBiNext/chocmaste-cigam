@@ -73,6 +73,13 @@ export class NotasFiscaisCigamRepository {
     );
   }
 
+  async updateTrayInvoiceId(id: string, trayInvoiceId: string): Promise<void> {
+    await NotasFiscaisCigamModel.update(
+      { tray_invoice_id: trayInvoiceId },
+      { where: { id } }
+    );
+  }
+
   async deleteById(id: string): Promise<void> {
     await NotasFiscaisCigamModel.destroy({ where: { id } });
   }
@@ -99,6 +106,7 @@ export class NotasFiscaisCigamRepository {
       chave_acesso: data.chave_acesso,
       enviado_marketplace: data.enviado_marketplace,
       xml_content: data.xml_content,
+      tray_invoice_id: data.tray_invoice_id,
       created_at: data.created_at,
       updated_at: data.updated_at,
     };

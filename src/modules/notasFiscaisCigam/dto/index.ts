@@ -23,6 +23,7 @@ export interface ResponseNotaFiscalCigamDTO {
   chave_acesso: string | null;
   enviado_marketplace: boolean;
   xml_content: string;
+  tray_invoice_id: string | null;
   created_at: Date;
   updated_at: Date;
 }

@@ -11,7 +11,9 @@ No fluxo de integração entre o **CIGAM ERP** e os canais de venda (marketplace
 O backend Chocmaster encaminha a nota fiscal para a Tray através do serviço [`TrayFiscalService`](file:///c:/Users/geovani.santos/Desktop/Projetos%20Clientes/chocmaster/chocmaste-cigam/src/modules/tray/services/trayFiscalService.ts).
 
 ### Comportamento da API Tray
-* **Registro de NF-e (`POST /orders/:order_id/invoices`)**: Responsável unicamente por associar os dados fiscais (número, série, chave de acesso de 44 dígitos, valor e data de emissão) ao pedido. **A API da Tray não transiciona o status do pedido automaticamente** ao receber essa chamada.
+* **Registro de NF-e (`POST /orders/:order_id/invoices`)**: Responsável unicamente por associar os dados fiscais (número, série, chave de acesso de 44 dígitos, valor, data de emissão e o XML da NF-e) ao pedido. **A API da Tray não transiciona o status do pedido automaticamente** ao receber essa chamada.
+  * O campo `xml_danfe` é enviado com o XML completo da NF-e (quando disponível) — é o que a tela de "Dados Fiscais" do pedido na Tray exibe/disponibiliza para download.
+  * A Tray também aceita `link` (URL do DANFE em PDF) e `ProductCfop` (CFOP por produto/variação do pedido), mas o projeto ainda não os envia: não há hoje um link de DANFE hospedado nem um mapeamento local de `product_id`/`variation_id` da Tray por item do pedido — implementá-los exigiria armazenar itens de pedido com os IDs da Tray (ou consultar `GET /orders/:id/complete` em tempo real) e um parser de XML para extrair o CFOP por item (`<det><prod><CFOP>`).
 * **Atualização de Status (`PUT /orders/:id`)**: Rota oficial da Tray utilizada para transicionar o ciclo de vida do pedido, alterando o campo `status_id`.
 
 ---

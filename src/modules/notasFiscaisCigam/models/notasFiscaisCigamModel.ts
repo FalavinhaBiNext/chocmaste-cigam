@@ -13,6 +13,7 @@ export class NotasFiscaisCigamModel extends Model {
   public chave_acesso!: string | null;
   public enviado_marketplace!: boolean;
   public xml_content!: string;
+  public tray_invoice_id!: string | null;
   public readonly created_at!: Date;
   public readonly updated_at!: Date;
 }
@@ -66,6 +67,11 @@ NotasFiscaisCigamModel.init({
   xml_content: {
     type: Sequelize.TEXT,
     allowNull: false,
+  },
+  tray_invoice_id: {
+    type: Sequelize.STRING,
+    allowNull: true,
+    defaultValue: null,
   },
 }, {
   sequelize,
