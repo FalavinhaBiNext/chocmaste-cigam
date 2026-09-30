@@ -310,4 +310,21 @@ export class TrayController {
       data: result,
     });
   };
+
+  /**
+   * Diagnóstico temporário — consulta as notas fiscais de um pedido direto na Tray
+   * (GET /orders/:orderId/invoices), pra confirmar se um tray_invoice_id salvo
+   * localmente é reconhecido pela Tray. Somente leitura, não altera nada.
+   * GET /tray/debug/orders/:orderId/invoices
+   */
+  debugOrderInvoices = async (req: Request, res: Response) => {
+    const orderId = String(req.params.orderId);
+
+    const result = await this.httpClient.get(`/orders/${orderId}/invoices`);
+
+    res.status(200).json({
+      success: true,
+      data: result,
+    });
+  };
 }

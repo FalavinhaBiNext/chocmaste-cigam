@@ -30,6 +30,9 @@ export function createTrayRoutes(controller: TrayController): Router {
   router.get('/pedidos/:orderId/complete', asyncHandler(controller.getOrderComplete));
   router.get('/pedidos/:orderId', asyncHandler(controller.getOrder));
 
+  // Diagnóstico temporário (somente leitura)
+  router.get('/debug/orders/:orderId/invoices', asyncHandler(controller.debugOrderInvoices));
+
   // Emissor de etiqueta
   router.post('/shipping-label/register', asyncHandler(controller.registerShippingLabel));
   router.get('/shipping-label/print', asyncHandler(controller.printShippingLabel));
