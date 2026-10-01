@@ -1,9 +1,14 @@
 import { inject, injectable } from 'tsyringe';
 import { BlingOAuthService } from './blingOAuthService';
+import { BlingHttpClient } from './blingHttpClient';
 import { BlingRepository } from '../repositories/blingRepository';
 import { BlingAuthUrlDTO } from '../dto';
 import { SaveTokenInput } from '../bling.validator';
 import { IntegrationError } from '@/shared/errors/AppError';
+import { logger } from '@/shared/utils/logger';
+
+/** Situação do Bling atribuída ao pedido assim que a NF-e é enviada com sucesso ao marketplace. */
+export const BLING_SITUACAO_NFE_ENVIADA = 9;
 
 export interface TokenStatusResponse {
   authenticated: boolean;
@@ -32,8 +37,19 @@ export interface TokenStatusMultiAccountResponse {
 export class BlingService {
   constructor(
     @inject(BlingOAuthService) private readonly blingOAuthService: BlingOAuthService,
-    @inject(BlingRepository) private readonly blingRepository: BlingRepository
+    @inject(BlingRepository) private readonly blingRepository: BlingRepository,
+    @inject(BlingHttpClient) private readonly blingHttpClient: BlingHttpClient
   ) {}
+
+  /**
+   * Altera a situação de um pedido de venda no Bling.
+   * PATCH /pedidos/vendas/:idPedidoVenda/situacoes/:idSituacao
+   */
+  async atualizarSituacaoPedidoVenda(idPedidoVenda: string, idSituacao: number): Promise<void> {
+    logger.info(`[BLING] Atualizando situação do pedido de venda ${idPedidoVenda} para ${idSituacao}`);
+    await this.blingHttpClient.patch(`/pedidos/vendas/${idPedidoVenda}/situacoes/${idSituacao}`);
+    logger.success(`[BLING] Situação do pedido de venda ${idPedidoVenda} atualizada para ${idSituacao}`);
+  }
 
   generateAuthURL(state?: string, clientId?: string, clientSecret?: string): BlingAuthUrlDTO {
     return this.blingOAuthService.generateAuthURL(state, clientId, clientSecret);

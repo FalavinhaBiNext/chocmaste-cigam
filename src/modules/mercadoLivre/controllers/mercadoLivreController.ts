@@ -7,6 +7,7 @@ import { MercadoLivreFiscalService } from '../services/mercadoLivreFiscalService
 import { MercadoLivreShippingLabelService } from '../services/mercadoLivreShippingLabelService';
 import { NotasFiscaisCigamRepository } from '@/modules/notasFiscaisCigam/repositories/notasFiscaisCigamRepository';
 import { PedidoService } from '@/modules/pedido/services/pedidoService';
+import { BlingService, BLING_SITUACAO_NFE_ENVIADA } from '@/modules/bling/services/blingService';
 import { logger } from '@/shared/utils/logger';
 
 @injectable()
@@ -19,6 +20,7 @@ export class MercadoLivreController {
     @inject(MercadoLivreShippingLabelService) private readonly shippingLabelService: MercadoLivreShippingLabelService,
     @inject(NotasFiscaisCigamRepository) private readonly notasFiscaisRepo: NotasFiscaisCigamRepository,
     @inject(PedidoService) private readonly pedidoService: PedidoService,
+    @inject(BlingService) private readonly blingService: BlingService,
   ) {}
 
   /**
@@ -403,9 +405,15 @@ export class MercadoLivreController {
 
         // Atualizar status_nfe do pedido
         try {
-          const pedido = await this.pedidoService.findByIdBling(String(orderId));
+          const pedido = await this.pedidoService.findByNumeroLoja(String(orderId));
           if (pedido) {
             await this.pedidoService.update(pedido.id, { status_nfe: 'enviada' });
+
+            try {
+              await this.blingService.atualizarSituacaoPedidoVenda(pedido.id_bling, BLING_SITUACAO_NFE_ENVIADA);
+            } catch (blingError: any) {
+              logger.error(`[ML INVOICE] Erro ao atualizar situação do pedido #${orderId} no Bling: ${blingError.message}`);
+            }
           }
         } catch {
           // Pedido pode não existir na tabela local

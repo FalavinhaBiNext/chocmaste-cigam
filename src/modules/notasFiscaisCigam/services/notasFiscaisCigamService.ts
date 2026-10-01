@@ -4,6 +4,7 @@ import { PedidoService } from '@/modules/pedido/services/pedidoService';
 import { MercadoLivreFiscalService } from '@/modules/mercadoLivre/services/mercadoLivreFiscalService';
 import { ShopeeFiscalService } from '@/modules/shopee/services/shopeeFiscalService';
 import { TrayFiscalService } from '@/modules/tray/services/trayFiscalService';
+import { BlingService, BLING_SITUACAO_NFE_ENVIADA } from '@/modules/bling/services/blingService';
 import { CigamNfeRoutingService } from './cigamNfeRoutingService';
 import { ReceberNotaFiscalInput } from '../notasFiscaisCigam.validator';
 import { ResponseNotaFiscalCigamDTO } from '../dto';
@@ -24,9 +25,27 @@ export class NotasFiscaisCigamService {
     private readonly shopeeFiscalService: ShopeeFiscalService,
     @inject(TrayFiscalService)
     private readonly trayFiscalService: TrayFiscalService,
+    @inject(BlingService)
+    private readonly blingService: BlingService,
     @inject(CigamNfeRoutingService)
     private readonly cigamNfeRoutingService: CigamNfeRoutingService,
   ) {}
+
+  /**
+   * Atualiza a situação do pedido no Bling assim que a NF-e é enviada com sucesso
+   * ao marketplace. Erro aqui é apenas logado — o envio da NF-e já foi confirmado
+   * pelo marketplace e não deve ser revertido por uma falha secundária no Bling.
+   */
+  private async atualizarSituacaoBling(idBling: string | null | undefined, referencia: string): Promise<void> {
+    if (!idBling) {
+      return;
+    }
+    try {
+      await this.blingService.atualizarSituacaoPedidoVenda(idBling, BLING_SITUACAO_NFE_ENVIADA);
+    } catch (error: any) {
+      logger.error(`[NF-E CIGAM] Erro ao atualizar situação do pedido ${referencia} no Bling: ${error.message}`);
+    }
+  }
 
   async receberNotaFiscal(input: ReceberNotaFiscalInput): Promise<ResponseNotaFiscalCigamDTO> {
     logger.info(`[NF-E CIGAM] Recebendo webhook de NF-e para pedido CIGAM: ${input.numeroPedido}`);
@@ -106,6 +125,7 @@ export class NotasFiscaisCigamService {
           await this.pedidoService.update(pedidoVinculado.id, {
             status_nfe: 'enviada',
           });
+          await this.atualizarSituacaoBling(pedidoVinculado.id_bling, input.numeroPedido);
           logger.success(`[NF-E CIGAM] NF-e enviada com sucesso ao Mercado Livre. Shipment: ${resultado.shipmentId}`);
         } else {
           logger.warn(`[NF-E CIGAM] NF-e não pôde ser enviada ao ML: ${resultado.error}. Status mantido como 'faturada'.`);
@@ -315,6 +335,7 @@ export class NotasFiscaisCigamService {
       const pedidoVinculado = await this.pedidoService.findByNumeroPedidoCigam(nota.numero_pedido_cigam);
       if (pedidoVinculado) {
         await this.pedidoService.update(pedidoVinculado.id, { status_nfe: 'enviada' });
+        await this.atualizarSituacaoBling(pedidoVinculado.id_bling, nota.numero_pedido_cigam);
       }
     } catch (error: any) {
       logger.error(`[NF-E CIGAM] Erro ao atualizar status_nfe do pedido após envio manual: ${error.message}`);

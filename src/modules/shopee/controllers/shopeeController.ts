@@ -6,6 +6,7 @@ import { ShopeeOrderService } from '../services/shopeeOrderService';
 import { ShopeeFiscalService } from '../services/shopeeFiscalService';
 import { PedidoService } from '@/modules/pedido/services/pedidoService';
 import { NotasFiscaisCigamRepository } from '@/modules/notasFiscaisCigam/repositories/notasFiscaisCigamRepository';
+import { BlingService, BLING_SITUACAO_NFE_ENVIADA } from '@/modules/bling/services/blingService';
 import { logger } from '@/shared/utils/logger';
 import { ValidationError } from '@/shared/errors/AppError';
 
@@ -18,6 +19,7 @@ export class ShopeeController {
     @inject(ShopeeFiscalService) private readonly fiscalService: ShopeeFiscalService,
     @inject(PedidoService) private readonly pedidoService: PedidoService,
     @inject(NotasFiscaisCigamRepository) private readonly notasFiscaisRepo: NotasFiscaisCigamRepository,
+    @inject(BlingService) private readonly blingService: BlingService,
   ) {}
 
   /**
@@ -372,6 +374,12 @@ export class ShopeeController {
           const pedido = await this.pedidoService.findByNumeroLoja(orderSn);
           if (pedido) {
             await this.pedidoService.update(pedido.id, { status_nfe: 'enviada' });
+
+            try {
+              await this.blingService.atualizarSituacaoPedidoVenda(pedido.id_bling, BLING_SITUACAO_NFE_ENVIADA);
+            } catch (blingError: any) {
+              logger.error(`[SHOPEE INVOICE] Erro ao atualizar situação do pedido #${orderSn} no Bling: ${blingError.message}`);
+            }
           }
         } catch {
           // Pedido pode não existir na tabela local
