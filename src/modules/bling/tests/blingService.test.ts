@@ -6,11 +6,21 @@ describe('BlingService', () => {
   let svc: BlingService;
   let mockOAuth: any;
   let mockRepo: any;
+  let mockHttpClient: any;
 
   beforeEach(() => {
     mockOAuth = { generateAuthURL: vi.fn(), exchangeCode: vi.fn(), refreshAccessToken: vi.fn() };
     mockRepo = { findActive: vi.fn(), save: vi.fn(), update: vi.fn() };
-    svc = new BlingService(mockOAuth, mockRepo);
+    mockHttpClient = { patch: vi.fn() };
+    svc = new BlingService(mockOAuth, mockRepo, mockHttpClient);
+  });
+
+  describe('atualizarSituacaoPedidoVenda', () => {
+    it('should PATCH the situacoes endpoint with the given ids', async () => {
+      mockHttpClient.patch.mockResolvedValue(undefined);
+      await svc.atualizarSituacaoPedidoVenda('12345', 9);
+      expect(mockHttpClient.patch).toHaveBeenCalledWith('/pedidos/vendas/12345/situacoes/9');
+    });
   });
 
   describe('generateAuthURL', () => {

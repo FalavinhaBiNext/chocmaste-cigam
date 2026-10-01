@@ -45,7 +45,11 @@ export class BlingService {
    * Altera a situação de um pedido de venda no Bling.
    * PATCH /pedidos/vendas/:idPedidoVenda/situacoes/:idSituacao
    */
-  async atualizarSituacaoPedidoVenda(idPedidoVenda: string, idSituacao: number): Promise<void> {
+  async atualizarSituacaoPedidoVenda(idPedidoVenda: string | null | undefined, idSituacao: number): Promise<void> {
+    if (!idPedidoVenda) {
+      logger.warn(`[BLING] Pedido sem id_bling válido — não é possível atualizar situação para ${idSituacao}.`);
+      return;
+    }
     logger.info(`[BLING] Atualizando situação do pedido de venda ${idPedidoVenda} para ${idSituacao}`);
     await this.blingHttpClient.patch(`/pedidos/vendas/${idPedidoVenda}/situacoes/${idSituacao}`);
     logger.success(`[BLING] Situação do pedido de venda ${idPedidoVenda} atualizada para ${idSituacao}`);
