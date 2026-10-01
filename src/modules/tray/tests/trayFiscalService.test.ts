@@ -9,13 +9,17 @@ import { TrayFiscalService } from '../services/trayFiscalService';
 describe('TrayFiscalService', () => {
   let fiscalService: TrayFiscalService;
   let mockHttpClient: any;
+  let mockOrderService: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
     mockHttpClient = {
       post: vi.fn().mockResolvedValue({ message: 'Created', id: '123' }),
     };
-    fiscalService = new TrayFiscalService(mockHttpClient);
+    mockOrderService = {
+      buscarPedidoCompleto: vi.fn(),
+    };
+    fiscalService = new TrayFiscalService(mockHttpClient, mockOrderService);
   });
 
   it('deve abortar se a chave de acesso não tiver 44 dígitos', async () => {
@@ -153,13 +157,17 @@ describe('TrayFiscalService', () => {
 describe('TrayFiscalService.atualizarNFe', () => {
   let fiscalService: TrayFiscalService;
   let mockHttpClient: any;
+  let mockOrderService: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
     mockHttpClient = {
       put: vi.fn().mockResolvedValue({ message: 'Saved', id: '500' }),
     };
-    fiscalService = new TrayFiscalService(mockHttpClient);
+    mockOrderService = {
+      buscarPedidoCompleto: vi.fn(),
+    };
+    fiscalService = new TrayFiscalService(mockHttpClient, mockOrderService);
   });
 
   it('deve abortar se a chave de acesso não tiver 44 dígitos', async () => {
@@ -216,6 +224,7 @@ describe('TrayFiscalService.atualizarNFe', () => {
 describe('TrayFiscalService — atualização automática 10s após o envio', () => {
   let fiscalService: TrayFiscalService;
   let mockHttpClient: any;
+  let mockOrderService: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -224,7 +233,10 @@ describe('TrayFiscalService — atualização automática 10s após o envio', ()
       post: vi.fn().mockResolvedValue({ message: 'Created', id: '123' }),
       put: vi.fn().mockResolvedValue({ message: 'Saved', id: '123' }),
     };
-    fiscalService = new TrayFiscalService(mockHttpClient);
+    mockOrderService = {
+      buscarPedidoCompleto: vi.fn(),
+    };
+    fiscalService = new TrayFiscalService(mockHttpClient, mockOrderService);
   });
 
   afterEach(() => {
