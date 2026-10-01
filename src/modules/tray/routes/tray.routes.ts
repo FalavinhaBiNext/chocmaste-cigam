@@ -36,6 +36,7 @@ export function createTrayRoutes(controller: TrayController): Router {
   // Emissor de etiqueta
   router.post('/shipping-label/register', asyncHandler(controller.registerShippingLabel));
   router.get('/shipping-label/print', asyncHandler(controller.printShippingLabel));
+  router.get('/orders/:orderId/shipping-label', asyncHandler(controller.printShippingLabelAuthenticado));
   router.post('/orders/:orderId/shipping-label', asyncHandler(controller.linkOrderShippingLabel));
   router.delete('/orders/:orderId/shipping-label', asyncHandler(controller.unlinkOrderShippingLabel));
 

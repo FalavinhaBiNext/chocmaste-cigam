@@ -5,7 +5,6 @@ import { TrayTokenRepository } from '../repositories/trayTokenRepository';
 import { TrayHttpClient } from '../services/trayHttpClient';
 import { TrayShippingLabelService } from '../services/trayShippingLabelService';
 import { TrayOrderService } from '../services/trayOrderService';
-import { renderShippingLabelHtml } from '../templates/shippingLabelTemplate';
 import { logger } from '@/shared/utils/logger';
 import { ValidationError } from '@/shared/errors/AppError';
 
@@ -272,8 +271,22 @@ export class TrayController {
 
     logger.route(`Endpoint GET /tray/shipping-label/print chamado para pedido ${orderId}`);
 
-    const completeOrder = await this.shippingLabelService.getCompleteOrder(orderId);
-    const html = renderShippingLabelHtml(completeOrder);
+    const html = await this.shippingLabelService.obterEtiquetaHtml(orderId);
+
+    res.status(200).set('Content-Type', 'text/html; charset=utf-8').send(html);
+  };
+
+  /**
+   * Equivalente autenticado de printShippingLabel, usado pelo botão "Imprimir
+   * Etiqueta" da tela de Pedidos do Chocmaster (em vez do IFRAME aberto pela Tray).
+   * GET /tray/orders/:orderId/shipping-label
+   */
+  printShippingLabelAuthenticado = async (req: Request, res: Response) => {
+    const orderId = String(req.params.orderId);
+
+    logger.route(`Endpoint GET /tray/orders/${orderId}/shipping-label chamado`);
+
+    const html = await this.shippingLabelService.obterEtiquetaHtml(orderId);
 
     res.status(200).set('Content-Type', 'text/html; charset=utf-8').send(html);
   };

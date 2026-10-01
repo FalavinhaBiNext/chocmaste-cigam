@@ -4,6 +4,7 @@ import { ShopeeAuthService } from '../services/shopeeAuthService';
 import { ShopeeTokenRepository } from '../repositories/shopeeTokenRepository';
 import { ShopeeOrderService } from '../services/shopeeOrderService';
 import { ShopeeFiscalService } from '../services/shopeeFiscalService';
+import { ShopeeShippingLabelService } from '../services/shopeeShippingLabelService';
 import { PedidoService } from '@/modules/pedido/services/pedidoService';
 import { NotasFiscaisCigamRepository } from '@/modules/notasFiscaisCigam/repositories/notasFiscaisCigamRepository';
 import { BlingService, BLING_SITUACAO_NFE_ENVIADA } from '@/modules/bling/services/blingService';
@@ -17,6 +18,7 @@ export class ShopeeController {
     @inject(ShopeeTokenRepository) private readonly tokenRepository: ShopeeTokenRepository,
     @inject(ShopeeOrderService) private readonly orderService: ShopeeOrderService,
     @inject(ShopeeFiscalService) private readonly fiscalService: ShopeeFiscalService,
+    @inject(ShopeeShippingLabelService) private readonly shippingLabelService: ShopeeShippingLabelService,
     @inject(PedidoService) private readonly pedidoService: PedidoService,
     @inject(NotasFiscaisCigamRepository) private readonly notasFiscaisRepo: NotasFiscaisCigamRepository,
     @inject(BlingService) private readonly blingService: BlingService,
@@ -399,6 +401,36 @@ export class ShopeeController {
       }
     } catch (error: any) {
       logger.error(`[SHOPEE INVOICE] Erro: ${error.message}`);
+      res.status(500).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+
+  /**
+   * Gera e baixa a etiqueta de envio de um pedido da Shopee.
+   * GET /shopee/orders/:orderSn/shipping-label
+   */
+  getShippingLabel = async (req: Request, res: Response): Promise<void> => {
+    const orderSn = String(req.params.orderSn);
+    try {
+      const resultado = await this.shippingLabelService.obterEtiqueta(orderSn);
+
+      if (!resultado.success || !resultado.buffer) {
+        res.status(400).json({
+          success: false,
+          message: resultado.error || 'Não foi possível obter a etiqueta.',
+          errorCode: resultado.errorCode,
+        });
+        return;
+      }
+
+      res.setHeader('Content-Type', resultado.contentType || 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${resultado.filename}"`);
+      res.status(200).send(resultado.buffer);
+    } catch (error: any) {
+      logger.error(`[SHOPEE LABEL] Erro ao obter etiqueta do pedido #${orderSn}: ${error.message}`);
       res.status(500).json({
         success: false,
         message: error.message,

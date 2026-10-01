@@ -2,6 +2,7 @@ import { inject, injectable } from 'tsyringe';
 import { TrayHttpClient } from './trayHttpClient';
 import { TrayOrderService } from './trayOrderService';
 import { TrayCompleteOrder, TrayShippingLabelRegisterResponse } from '../dto';
+import { renderShippingLabelHtml } from '../templates/shippingLabelTemplate';
 import { logger } from '@/shared/utils/logger';
 
 @injectable()
@@ -64,5 +65,14 @@ export class TrayShippingLabelService {
    */
   async getCompleteOrder(orderId: string): Promise<TrayCompleteOrder> {
     return this.orderService.buscarPedidoCompleto(orderId);
+  }
+
+  /**
+   * Monta o HTML da etiqueta de um pedido. Usado tanto pelo IFRAME público que a
+   * Tray abre no admin da loja quanto pelo botão "Imprimir Etiqueta" do Chocmaster.
+   */
+  async obterEtiquetaHtml(orderId: string): Promise<string> {
+    const completeOrder = await this.getCompleteOrder(orderId);
+    return renderShippingLabelHtml(completeOrder);
   }
 }

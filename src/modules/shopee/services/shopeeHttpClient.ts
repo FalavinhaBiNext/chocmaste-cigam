@@ -163,4 +163,43 @@ export class ShopeeHttpClient {
       throw new Error(`Erro na API Shopee [${errorCode}]: ${errorMsg}`);
     }
   }
+
+  /**
+   * POST cuja resposta é binária (ex.: /logistics/download_shipping_document,
+   * que devolve o PDF diretamente no corpo). Em caso de erro, a Shopee ainda
+   * responde em JSON — por isso o corpo de erro é lido como texto e re-parseado.
+   */
+  async postBinary(path: string, body?: any, extraParams?: Record<string, any>): Promise<Buffer> {
+    const { partnerId, partnerKey, shopId, accessToken } = await this.getAuthParams();
+    const timestamp = Math.floor(Date.now() / 1000);
+    const sign = this.generateSign(partnerKey, partnerId, timestamp, path, accessToken, shopId);
+
+    const params = {
+      partner_id: partnerId,
+      timestamp,
+      sign,
+      access_token: accessToken,
+      shop_id: shopId,
+      ...extraParams,
+    };
+
+    try {
+      const response = await axios.post(`${getShopeeApiBase()}${path}`, body, {
+        params,
+        responseType: 'arraybuffer',
+      });
+      return Buffer.from(response.data);
+    } catch (error: any) {
+      let errorMsg = error.message;
+      let errorCode: string | undefined;
+      try {
+        const parsed = JSON.parse(Buffer.from(error.response?.data ?? '').toString('utf-8'));
+        errorMsg = parsed?.message || errorMsg;
+        errorCode = parsed?.error;
+      } catch {
+        // corpo de erro não era JSON — mantém error.message
+      }
+      throw new Error(`Erro na API Shopee [${errorCode}]: ${errorMsg}`);
+    }
+  }
 }
