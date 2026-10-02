@@ -48,18 +48,6 @@ export interface ShopeeOrderDetail {
   };
 }
 
-export interface ShopeeShipmentStatus {
-  order_sn: string;
-  shipping_carrier: string;
-  tracking_number: string;
-  logistic_status: string;
-  shipping_proof?: string;
-  pickup_schedule?: {
-    pickup_time_id: string;
-    pickup_time: string;
-  };
-}
-
 export interface ShopeeTrackingEvent {
   logistics_status: string;
   description: string;
@@ -106,12 +94,14 @@ export class ShopeeOrderService {
       throw new Error(`Erro Shopee: ${response.message || response.error}`);
     }
 
-    logger.info(`[SHOPEE] ${response.order_list?.length || 0} pedidos encontrados. more=${response.more}`);
+    // Todo endpoint v2 da Shopee embrulha os dados reais em "response".
+    const data = response.response || {};
+    logger.info(`[SHOPEE] ${data.order_list?.length || 0} pedidos encontrados. more=${data.more}`);
 
     return {
-      orders: response.order_list || [],
-      more: response.more || false,
-      nextCursor: response.next_cursor || '0',
+      orders: data.order_list || [],
+      more: data.more || false,
+      nextCursor: data.next_cursor || '0',
     };
   }
 
@@ -126,32 +116,7 @@ export class ShopeeOrderService {
       throw new Error(`Erro Shopee: ${response.message || response.error}`);
     }
 
-    return response.order_list || [];
-  }
-
-  async buscarStatusEnvio(orderSn: string): Promise<ShopeeShipmentStatus> {
-    logger.info(`[SHOPEE] Buscando status de envio do pedido ${orderSn}`);
-
-    const response = await this.httpClient.get<any>('/logistics/get_shipping_parameter', {
-      order_sn: orderSn,
-    });
-
-    if (response.error) {
-      throw new Error(`Erro Shopee: ${response.message || response.error}`);
-    }
-
-    const shipping = response.shipping_parameter || {};
-    const logistics = shipping.logistic_list || [];
-    const selected = logistics.find((l: any) => l.selected) || logistics[0] || {};
-
-    return {
-      order_sn: orderSn,
-      shipping_carrier: selected.logistic_name || '',
-      tracking_number: selected.tracking_number || '',
-      logistic_status: selected.logistic_status || 'LOGISTICS_NOT_START',
-      shipping_proof: selected.shipping_proof || undefined,
-      pickup_schedule: selected.pickup_schedule || undefined,
-    };
+    return response.response?.order_list || [];
   }
 
   async buscarNumeroRastreio(orderSn: string): Promise<{ trackingNumber: string; shippingCarrier: string }> {
@@ -165,9 +130,10 @@ export class ShopeeOrderService {
       throw new Error(`Erro Shopee: ${response.message || response.error}`);
     }
 
+    const data = response.response || {};
     return {
-      trackingNumber: response.tracking_number || '',
-      shippingCarrier: response.shipping_carrier || '',
+      trackingNumber: data.tracking_number || '',
+      shippingCarrier: data.shipping_carrier || '',
     };
   }
 
@@ -185,15 +151,16 @@ export class ShopeeOrderService {
       throw new Error(`Erro Shopee: ${response.message || response.error}`);
     }
 
-    const events: ShopeeTrackingEvent[] = (response.tracking_info || []).map((event: any) => ({
+    const data = response.response || {};
+    const events: ShopeeTrackingEvent[] = (data.tracking_info || []).map((event: any) => ({
       logistics_status: event.logistics_status,
       description: event.description,
       updateTime: new Date(event.update_time * 1000).toISOString(),
     }));
 
     return {
-      order_sn: response.order_sn || orderSn,
-      logistics_status: response.logistics_status,
+      order_sn: data.order_sn || orderSn,
+      logistics_status: data.logistics_status,
       events,
     };
   }

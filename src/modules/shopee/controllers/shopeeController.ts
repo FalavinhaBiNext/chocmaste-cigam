@@ -265,25 +265,32 @@ export class ShopeeController {
       const order = orders[0];
       logger.info(`[SHOPEE SHIPMENT] Pedido encontrado. Status: ${order.order_status}`);
 
-      // 2. Buscar status de envio
-      logger.info(`[SHOPEE SHIPMENT] Passo 2: Buscando status de envio...`);
-      const shipment = await this.orderService.buscarStatusEnvio(orderSn);
+      // 2. Buscar número de rastreio, se já atribuído (pedido pode ainda não ter sido confirmado pro envio)
+      logger.info(`[SHOPEE SHIPMENT] Passo 2: Buscando número de rastreio...`);
+      let trackingNumber: string | null = null;
+      let shippingCarrier: string | null = null;
+      try {
+        const tracking = await this.orderService.buscarNumeroRastreio(orderSn);
+        trackingNumber = tracking.trackingNumber || null;
+        shippingCarrier = tracking.shippingCarrier || null;
+      } catch (error: any) {
+        logger.info(`[SHOPEE SHIPMENT] Pedido ${orderSn} ainda sem código de rastreio atribuído: ${error.message}`);
+      }
 
-      logger.info(`[SHOPEE SHIPMENT] Status de envio: ${shipment.logistic_status}`);
-
-      // 3. Determinar se está pronto para invoice
-      const readyForInvoice = order.order_status === 'READY_TO_SHIP' &&
-        shipment.logistic_status === 'LOGISTICS_NOT_START';
+      // 3. A Shopee libera o upload de NF-e quando o pedido está em INVOICE_PENDING
+      // (precondição documentada de v2.order.upload_invoice_doc — não existe um campo
+      // de "logistic_status" utilizável pra isso antes do envio ser confirmado).
+      const readyForInvoice = order.order_status === 'INVOICE_PENDING';
 
       res.status(200).json({
         success: true,
         data: {
           orderSn,
-          shipmentId: shipment.tracking_number || null,
+          shipmentId: trackingNumber,
           status: order.order_status,
-          shippingCarrier: shipment.shipping_carrier,
-          trackingNumber: shipment.tracking_number,
-          logisticStatus: shipment.logistic_status,
+          shippingCarrier,
+          trackingNumber,
+          logisticStatus: trackingNumber ? 'LOGISTICS_REQUEST_CREATED' : 'LOGISTICS_NOT_START',
           readyForInvoice,
         },
       });

@@ -4,7 +4,7 @@ import { MercadoLivreAuthService } from '../services/mercadoLivreAuthService';
 import { MercadoLivreTokenRepository } from '../repositories/mercadoLivreTokenRepository';
 import { MercadoLivreHttpClient } from '../services/mercadoLivreHttpClient';
 import { MercadoLivreFiscalService } from '../services/mercadoLivreFiscalService';
-import { MercadoLivreShippingLabelService } from '../services/mercadoLivreShippingLabelService';
+import { MercadoLivreShippingLabelService, SUBSTATUS_COM_ETIQUETA_DISPONIVEL } from '../services/mercadoLivreShippingLabelService';
 import { NotasFiscaisCigamRepository } from '@/modules/notasFiscaisCigam/repositories/notasFiscaisCigamRepository';
 import { PedidoService } from '@/modules/pedido/services/pedidoService';
 import { BlingService, BLING_SITUACAO_NFE_ENVIADA } from '@/modules/bling/services/blingService';
@@ -347,7 +347,7 @@ export class MercadoLivreController {
       const status = shipment.status;
       const substatus = shipment.substatus;
       const readyForInvoice = status === 'ready_to_ship' && substatus === 'invoice_pending';
-      const readyToPrint = status === 'ready_to_ship' && substatus === 'ready_to_print';
+      const readyToPrint = status === 'ready_to_ship' && SUBSTATUS_COM_ETIQUETA_DISPONIVEL.includes(substatus);
       const logisticType = shipment.logistic?.type ?? shipment.logistic_type ?? null;
 
       logger.info(`[ML SHIPMENT] Passo 5: Resultado final — readyForInvoice=${readyForInvoice}, readyToPrint=${readyToPrint}, logisticType=${logisticType}`);

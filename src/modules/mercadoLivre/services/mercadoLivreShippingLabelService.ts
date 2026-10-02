@@ -11,6 +11,13 @@ const ML_API_BASE = 'https://api.mercadolibre.com';
 // Fulfillment não entra aqui — o próprio ML cuida do envio nesse caso.
 const LOGISTIC_TYPES_COM_ETIQUETA = ['drop_off', 'xd_drop_off', 'cross_docking', 'self_service'];
 
+// "ready_to_print": etiqueta ainda não gerada, mas liberada. "printed": já foi
+// impressa antes — a etiqueta continua disponível pra reimpressão (ex.: extraviou
+// o papel, trocou a impressora). Só bloqueia fora desses dois substatus.
+// Exportado pra o controller usar o mesmo critério ao montar o readyToPrint
+// devolvido ao frontend (que é o que habilita/desabilita o botão).
+export const SUBSTATUS_COM_ETIQUETA_DISPONIVEL = ['ready_to_print', 'printed'];
+
 export interface ShippingLabelResult {
   success: boolean;
   buffer?: Buffer;
@@ -71,7 +78,7 @@ export class MercadoLivreShippingLabelService {
         };
       }
 
-      if (status !== 'ready_to_ship' || substatus !== 'ready_to_print') {
+      if (status !== 'ready_to_ship' || !SUBSTATUS_COM_ETIQUETA_DISPONIVEL.includes(substatus)) {
         logger.warn(`[ML LABEL] Shipment ${shipmentId} ainda não está pronto pra impressão. Status atual: ${status}/${substatus}.`);
         return {
           success: false,
@@ -99,19 +106,49 @@ export class MercadoLivreShippingLabelService {
           },
           headers: {
             'Authorization': `Bearer ${token.access_token}`,
+            // O ML decide PDF puro vs. ZIP (PDF + TXT Zebra) com base nesse header,
+            // não só no response_type — sem ele, o corpo pode vir num formato
+            // diferente do que o Content-Type/nome de arquivo abaixo assumiam.
+            'Accept': 'application/zip',
           },
           responseType: 'arraybuffer',
           timeout: 30000,
         }
       );
 
+      // Usa o Content-Type real devolvido pelo ML em vez de assumir sempre "zip" —
+      // se vier só o PDF (ou qualquer outro formato), o arquivo salvo tem que
+      // refletir isso, senão o cliente recebe um arquivo com extensão errada
+      // (ex.: um PDF renomeado pra .zip, que "abre corrompido").
+      const actualContentType = String(response.headers['content-type'] || '').split(';')[0].trim();
+
+      // O ML pode responder 200 com um corpo JSON de erro em vez de status HTTP de
+      // falha — nesse caso o buffer não é um arquivo válido, é texto.
+      if (actualContentType.includes('json') || actualContentType.includes('text')) {
+        let jsonMessage: string | undefined;
+        try {
+          jsonMessage = JSON.parse(Buffer.from(response.data).toString('utf-8'))?.message;
+        } catch {
+          // corpo não era JSON — segue com a mensagem genérica abaixo
+        }
+        logger.error(`[ML LABEL] ML devolveu ${actualContentType} em vez de um arquivo para o shipment ${shipmentId}: ${jsonMessage || '(corpo não-JSON)'}`);
+        return {
+          success: false,
+          errorCode: 'NOT_PRINTABLE',
+          error: jsonMessage || 'O Mercado Livre não devolveu um arquivo de etiqueta válido para este envio.',
+        };
+      }
+
       logger.success(`[ML LABEL] Etiqueta do shipment ${shipmentId} baixada com sucesso.`);
+
+      const isZip = actualContentType.includes('zip');
+      const extension = isZip ? 'zip' : actualContentType.includes('pdf') ? 'pdf' : 'bin';
 
       return {
         success: true,
         buffer: Buffer.from(response.data),
-        contentType: 'application/zip',
-        filename: `etiqueta-${shipmentId}.zip`,
+        contentType: actualContentType || 'application/zip',
+        filename: `etiqueta-${shipmentId}.${extension}`,
       };
     } catch (error: any) {
       const status = error.response?.status;
