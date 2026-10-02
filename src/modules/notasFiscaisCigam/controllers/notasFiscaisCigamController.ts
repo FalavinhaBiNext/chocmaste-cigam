@@ -93,26 +93,27 @@ export class NotasFiscaisCigamController {
   }
 
   /**
-   * Baixa o PDF da etiqueta recebida junto com a NF-e (quando o ERP a enviou).
+   * Baixa a etiqueta "completa" da nota: a etiqueta de envio do marketplace
+   * (ML/Shopee/Tray) juntada com o PDF que o ERP enviou junto com a NF-e,
+   * quando ambos existirem.
    * GET /notas-fiscais-cigam/:id/etiqueta
    */
   baixarEtiqueta = async (req: Request, res: Response): Promise<void> => {
     const id = String(req.params.id);
 
-    const etiquetaPdfBase64 = await this.notasFiscaisCigamService.buscarEtiquetaPdf(id);
+    const resultado = await this.notasFiscaisCigamService.buscarEtiquetaCombinada(id);
 
-    if (!etiquetaPdfBase64) {
-      res.status(404).json({
+    if (!resultado.success) {
+      res.status(400).json({
         success: false,
-        message: 'Esta NF-e não tem etiqueta PDF salva.',
+        message: resultado.message,
       });
       return;
     }
 
-    const buffer = Buffer.from(etiquetaPdfBase64, 'base64');
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="etiqueta-${id}.pdf"`);
-    res.status(200).send(buffer);
+    res.setHeader('Content-Disposition', `attachment; filename="${resultado.filename}"`);
+    res.status(200).send(resultado.buffer);
   }
 
   buscarPorId = async (req: Request, res: Response): Promise<void> => {

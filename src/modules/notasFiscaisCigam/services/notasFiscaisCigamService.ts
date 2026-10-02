@@ -2,15 +2,23 @@ import { injectable, inject } from 'tsyringe';
 import { NotasFiscaisCigamRepository } from '../repositories/notasFiscaisCigamRepository';
 import { PedidoService } from '@/modules/pedido/services/pedidoService';
 import { MercadoLivreFiscalService } from '@/modules/mercadoLivre/services/mercadoLivreFiscalService';
+import { MercadoLivreShippingLabelService } from '@/modules/mercadoLivre/services/mercadoLivreShippingLabelService';
 import { ShopeeFiscalService } from '@/modules/shopee/services/shopeeFiscalService';
+import { ShopeeShippingLabelService } from '@/modules/shopee/services/shopeeShippingLabelService';
 import { TrayFiscalService } from '@/modules/tray/services/trayFiscalService';
+import { TrayShippingLabelService } from '@/modules/tray/services/trayShippingLabelService';
 import { BlingService, BLING_SITUACAO_NFE_ENVIADA } from '@/modules/bling/services/blingService';
 import { CigamNfeRoutingService } from './cigamNfeRoutingService';
 import { ReceberNotaFiscalInput } from '../notasFiscaisCigam.validator';
 import { ResponseNotaFiscalCigamDTO } from '../dto';
 import { logger } from '@/shared/utils/logger';
 import { parseDateOnly } from '@/shared/utils/date';
+import { mergePdfBuffers, extractPdfFromZip } from '@/shared/utils/pdfUtils';
 import { ConflictError, NotFoundError } from '@/shared/errors/AppError';
+
+export type EtiquetaCombinadaResult =
+  | { success: true; buffer: Buffer; filename: string }
+  | { success: false; message: string };
 
 @injectable()
 export class NotasFiscaisCigamService {
@@ -21,10 +29,16 @@ export class NotasFiscaisCigamService {
     private readonly pedidoService: PedidoService,
     @inject(MercadoLivreFiscalService)
     private readonly mercadoLivreFiscalService: MercadoLivreFiscalService,
+    @inject(MercadoLivreShippingLabelService)
+    private readonly mercadoLivreShippingLabelService: MercadoLivreShippingLabelService,
     @inject(ShopeeFiscalService)
     private readonly shopeeFiscalService: ShopeeFiscalService,
+    @inject(ShopeeShippingLabelService)
+    private readonly shopeeShippingLabelService: ShopeeShippingLabelService,
     @inject(TrayFiscalService)
     private readonly trayFiscalService: TrayFiscalService,
+    @inject(TrayShippingLabelService)
+    private readonly trayShippingLabelService: TrayShippingLabelService,
     @inject(BlingService)
     private readonly blingService: BlingService,
     @inject(CigamNfeRoutingService)
@@ -155,13 +169,99 @@ export class NotasFiscaisCigamService {
     return nota;
   }
 
-  /** Busca o PDF (base64) da etiqueta salva junto com a nota, se houver. */
-  async buscarEtiquetaPdf(id: string): Promise<string | null> {
+  /**
+   * Busca a etiqueta "completa" de uma nota: a etiqueta de envio do marketplace
+   * (ML/Shopee/Tray) juntada num só PDF com a etiqueta/relatório que o ERP já
+   * enviou junto com a NF-e (campo etiqueta_pdf), quando ela existir.
+   * - Marketplace com integração de etiqueta, mas busca falhou/não liberada ainda:
+   *   retorna erro (não baixa só metade do documento).
+   * - Sem PDF do ERP salvo: devolve só a etiqueta do marketplace.
+   * - Marketplace sem integração de etiqueta nenhuma (ex.: bling, sem vínculo):
+   *   devolve só o PDF do ERP, se existir.
+   */
+  async buscarEtiquetaCombinada(id: string): Promise<EtiquetaCombinadaResult> {
     const nota = await this.notasFiscaisCigamRepository.findById(id);
     if (!nota) {
       throw new NotFoundError(`Nota fiscal com ID: ${id} não encontrada`);
     }
-    return this.notasFiscaisCigamRepository.findEtiquetaPdf(id);
+
+    const etiquetaPdfErpBase64 = await this.notasFiscaisCigamRepository.findEtiquetaPdf(id);
+    const erpPdf = etiquetaPdfErpBase64 ? Buffer.from(etiquetaPdfErpBase64, 'base64') : null;
+
+    // "temIntegracaoEtiqueta" distingue "o marketplace tem uma forma de buscar
+    // etiqueta, mas falhou/ainda não está pronta" (deve bloquear, sem baixar nada
+    // pela metade) de "esse marketplace nunca teve uma integração de etiqueta"
+    // (aí faz sentido cair pro PDF do ERP sozinho, se existir).
+    let temIntegracaoEtiqueta = false;
+    let marketplaceBuffer: Buffer | null = null;
+    let marketplaceError: string | undefined;
+
+    if (nota.marketplace === 'mercado_livre') {
+      temIntegracaoEtiqueta = true;
+      const resultado = await this.mercadoLivreShippingLabelService.obterEtiquetaPorPedidoCigam(nota.numero_pedido_cigam);
+      if (resultado.success && resultado.buffer) {
+        marketplaceBuffer = (resultado.contentType || '').includes('zip')
+          ? extractPdfFromZip(resultado.buffer)
+          : resultado.buffer;
+      } else {
+        marketplaceError = resultado.error || 'Não foi possível obter a etiqueta no Mercado Livre.';
+      }
+    } else if (nota.marketplace === 'shopee') {
+      temIntegracaoEtiqueta = true;
+      if (!nota.numero_pedido_marketplace) {
+        marketplaceError = 'NF-e sem número de pedido do marketplace vinculado.';
+      } else {
+        const resultado = await this.shopeeShippingLabelService.obterEtiqueta(nota.numero_pedido_marketplace);
+        if (resultado.success && resultado.buffer) {
+          marketplaceBuffer = resultado.buffer;
+        } else {
+          marketplaceError = resultado.error || 'Não foi possível obter a etiqueta na Shopee.';
+        }
+      }
+    } else if (nota.marketplace && nota.marketplace !== 'bling') {
+      // Qualquer outro marketplace (AMAZON, MAGAZINE LUIZA, LOJA VIRTUAL, PARTICULAR etc.)
+      // é vendido pela mesma loja Tray — mesma convenção usada em enviarParaMarketplace.
+      temIntegracaoEtiqueta = true;
+      if (!nota.numero_pedido_marketplace) {
+        marketplaceError = 'NF-e sem número de pedido do marketplace vinculado.';
+      } else {
+        try {
+          marketplaceBuffer = await this.trayShippingLabelService.obterEtiquetaPdf(nota.numero_pedido_marketplace);
+        } catch (error: any) {
+          marketplaceError = error.message;
+        }
+      }
+    }
+
+    if (!marketplaceBuffer) {
+      if (temIntegracaoEtiqueta) {
+        // O marketplace tem integração de etiqueta, mas a busca falhou (ainda
+        // processando, não liberada etc.) — não baixa nada pela metade, só o
+        // PDF do ERP sozinho teria menos valor do que a mensagem de erro real.
+        return {
+          success: false,
+          message: marketplaceError || 'Não foi possível obter a etiqueta do marketplace.',
+        };
+      }
+
+      // Marketplace nulo/sem integração de etiqueta (ex.: bling, ou nota ainda
+      // sem marketplace vinculado) — nunca haveria etiqueta de marketplace pra
+      // esperar, então o PDF do ERP sozinho é o resultado esperado.
+      if (erpPdf) {
+        return { success: true, buffer: erpPdf, filename: `etiqueta-${nota.numero_pedido_cigam}.pdf` };
+      }
+      return {
+        success: false,
+        message: 'Nenhuma etiqueta disponível para esta NF-e.',
+      };
+    }
+
+    if (!erpPdf) {
+      return { success: true, buffer: marketplaceBuffer, filename: `etiqueta-${nota.numero_pedido_cigam}.pdf` };
+    }
+
+    const combinado = await mergePdfBuffers([marketplaceBuffer, erpPdf]);
+    return { success: true, buffer: combinado, filename: `etiqueta-combinada-${nota.numero_pedido_cigam}.pdf` };
   }
 
   async findNotEnviadas(): Promise<ResponseNotaFiscalCigamDTO[]> {

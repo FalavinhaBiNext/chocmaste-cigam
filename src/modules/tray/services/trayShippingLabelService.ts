@@ -1,4 +1,5 @@
 import { inject, injectable } from 'tsyringe';
+import puppeteer from 'puppeteer';
 import { TrayHttpClient } from './trayHttpClient';
 import { TrayOrderService } from './trayOrderService';
 import { TrayCompleteOrder, TrayShippingLabelRegisterResponse } from '../dto';
@@ -74,5 +75,32 @@ export class TrayShippingLabelService {
   async obterEtiquetaHtml(orderId: string): Promise<string> {
     const completeOrder = await this.getCompleteOrder(orderId);
     return renderShippingLabelHtml(completeOrder);
+  }
+
+  /**
+   * Renderiza a etiqueta HTML da Tray como PDF via Chromium headless — a Tray não
+   * gera PDF nenhum (ver obterEtiquetaHtml), então pra poder juntar essa etiqueta
+   * com a do marketplace/ERP num único arquivo, precisamos converter nós mesmos.
+   */
+  async obterEtiquetaPdf(orderId: string): Promise<Buffer> {
+    const html = await this.obterEtiquetaHtml(orderId);
+
+    logger.info(`[TRAY LABEL] Renderizando etiqueta do pedido ${orderId} em PDF via Chromium headless...`);
+
+    const browser = await puppeteer.launch({
+      headless: true,
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    });
+
+    try {
+      const page = await browser.newPage();
+      await page.setContent(html, { waitUntil: 'domcontentloaded' });
+      const pdfBytes = await page.pdf({ format: 'a4', printBackground: true });
+      logger.success(`[TRAY LABEL] Etiqueta do pedido ${orderId} renderizada em PDF com sucesso.`);
+      return Buffer.from(pdfBytes);
+    } finally {
+      await browser.close();
+    }
   }
 }
