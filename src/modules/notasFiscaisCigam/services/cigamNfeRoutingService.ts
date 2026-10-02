@@ -5,6 +5,7 @@ import { ReceberNotaFiscalBodyInput } from '../notasFiscaisCigam.validator';
 export interface RouteCheckParams {
   body: ReceberNotaFiscalBodyInput;
   xmlContent: string;
+  etiquetaPdfBase64?: string;
   headers?: Record<string, any>;
 }
 
@@ -205,7 +206,7 @@ export class CigamNfeRoutingService {
     );
 
     try {
-      const responseData = await this.encaminharRequisicao(targetUrl, params.xmlContent, params.body);
+      const responseData = await this.encaminharRequisicao(targetUrl, params.xmlContent, params.body, params.etiquetaPdfBase64);
 
       logger.success(
         `[ROTEADOR NF-E CIGAM] NF-e encaminhada com sucesso para ${targetUrl} (Unidade ${info.unidade}).`
@@ -233,13 +234,21 @@ export class CigamNfeRoutingService {
   async encaminharRequisicao(
     targetUrl: string,
     xmlContent: string,
-    body: ReceberNotaFiscalBodyInput
+    body: ReceberNotaFiscalBodyInput,
+    etiquetaPdfBase64?: string
   ): Promise<any> {
     const formData = new FormData();
 
     // Adiciona o XML como Blob/Arquivo
     const xmlBlob = new Blob([xmlContent], { type: 'application/xml' });
     formData.append('xml', xmlBlob, 'nfe.xml');
+
+    // Adiciona o PDF da etiqueta, se houver
+    if (etiquetaPdfBase64) {
+      const etiquetaBuffer = Buffer.from(etiquetaPdfBase64, 'base64');
+      const etiquetaBlob = new Blob([etiquetaBuffer], { type: 'application/pdf' });
+      formData.append('etiqueta', etiquetaBlob, 'etiqueta.pdf');
+    }
 
     // Adiciona os campos de texto
     formData.append('numeroPedido', body.numeroPedido);

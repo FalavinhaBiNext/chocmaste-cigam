@@ -10,6 +10,8 @@ export const receberNotaFiscalSchema = z.object({
   numeroNf: z.string().optional(),
   serieNf: z.string().optional(),
   chaveAcessoNfe: z.string().optional(),
+  // PDF da etiqueta gerada no ERP, já em base64 (extraído do segundo arquivo multipart, campo "etiqueta") — opcional.
+  etiquetaPdfBase64: z.string().optional(),
 });
 
 // Schema apenas para os campos do body (sem o xml, que vem do arquivo)

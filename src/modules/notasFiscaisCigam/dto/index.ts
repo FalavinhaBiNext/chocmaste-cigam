@@ -9,6 +9,8 @@ export interface CreateNotaFiscalCigamDTO {
   chave_acesso?: string;
   enviado_marketplace?: boolean;
   xml_content: string;
+  /** PDF da etiqueta gerada no ERP, em base64 — opcional, nem toda NF-e vem com ela. */
+  etiqueta_pdf?: string;
 }
 
 export interface ResponseNotaFiscalCigamDTO {
@@ -24,6 +26,8 @@ export interface ResponseNotaFiscalCigamDTO {
   enviado_marketplace: boolean;
   xml_content: string;
   tray_invoice_id: string | null;
+  /** Indica se há etiqueta PDF salva, sem embutir o conteúdo binário na resposta — baixe via GET /:id/etiqueta. */
+  tem_etiqueta_pdf: boolean;
   created_at: Date;
   updated_at: Date;
 }

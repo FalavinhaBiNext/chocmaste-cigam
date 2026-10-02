@@ -17,6 +17,7 @@ export class NotasFiscaisCigamRepository {
       chave_acesso: data.chave_acesso,
       enviado_marketplace: data.enviado_marketplace ?? false,
       xml_content: data.xml_content,
+      etiqueta_pdf: data.etiqueta_pdf,
     });
 
     return this.toDTO(nota);
@@ -84,6 +85,12 @@ export class NotasFiscaisCigamRepository {
     await NotasFiscaisCigamModel.destroy({ where: { id } });
   }
 
+  /** Busca só o conteúdo base64 da etiqueta, sem montar o DTO completo (usado pra download). */
+  async findEtiquetaPdf(id: string): Promise<string | null> {
+    const nota = await NotasFiscaisCigamModel.findByPk(id, { attributes: ['etiqueta_pdf'] });
+    return nota?.get('etiqueta_pdf') as string | null ?? null;
+  }
+
   async countByEnviadoMarketplace(): Promise<{ enviado: number; pendente: number }> {
     const [enviado, pendente] = await Promise.all([
       NotasFiscaisCigamModel.count({ where: { enviado_marketplace: true } }),
@@ -107,6 +114,7 @@ export class NotasFiscaisCigamRepository {
       enviado_marketplace: data.enviado_marketplace,
       xml_content: data.xml_content,
       tray_invoice_id: data.tray_invoice_id,
+      tem_etiqueta_pdf: Boolean(data.etiqueta_pdf),
       created_at: data.created_at,
       updated_at: data.updated_at,
     };

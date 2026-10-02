@@ -18,13 +18,23 @@ export class NotasFiscaisCigamController {
   receberWebhook = async (req: Request, res: Response): Promise<void> => {
     logger.webhook('[NF-E CIGAM] Webhook de NF-e recebido');
 
+    const files = req.files as { xml?: Express.Multer.File[]; etiqueta?: Express.Multer.File[] } | undefined;
+    const xmlFile = files?.xml?.[0];
+
     // Verificar se o arquivo XML foi enviado
-    if (!req.file) {
+    if (!xmlFile) {
       throw new ValidationError('Arquivo XML é obrigatório. Envie como multipart/form-data no campo "xml".');
     }
 
     // Ler conteúdo do arquivo XML
-    const xmlContent = req.file.buffer.toString('utf-8');
+    const xmlContent = xmlFile.buffer.toString('utf-8');
+
+    // PDF da etiqueta é opcional — nem toda NF-e vem acompanhada dele
+    const etiquetaFile = files?.etiqueta?.[0];
+    const etiquetaPdfBase64 = etiquetaFile ? etiquetaFile.buffer.toString('base64') : undefined;
+    if (etiquetaFile) {
+      logger.info(`[NF-E CIGAM] Etiqueta PDF recebida junto com a NF-e (${etiquetaFile.size} bytes).`);
+    }
 
     // Validar campos do body
     const bodyData = validateReceberNotaFiscalBody(req.body);
@@ -33,6 +43,7 @@ export class NotasFiscaisCigamController {
     const routingResult = await this.cigamNfeRoutingService.verificarERotear({
       body: bodyData,
       xmlContent,
+      etiquetaPdfBase64,
       headers: req.headers,
     });
 
@@ -51,10 +62,11 @@ export class NotasFiscaisCigamController {
       return;
     }
 
-    // Combinar dados do body com o conteúdo do XML
+    // Combinar dados do body com o conteúdo do XML e, se houver, da etiqueta
     const input = {
       ...bodyData,
       xml: xmlContent,
+      etiquetaPdfBase64,
     };
 
     const result = await this.notasFiscaisCigamService.receberNotaFiscal(input);
@@ -78,6 +90,29 @@ export class NotasFiscaisCigamController {
       success: true,
       data: notas,
     });
+  }
+
+  /**
+   * Baixa o PDF da etiqueta recebida junto com a NF-e (quando o ERP a enviou).
+   * GET /notas-fiscais-cigam/:id/etiqueta
+   */
+  baixarEtiqueta = async (req: Request, res: Response): Promise<void> => {
+    const id = String(req.params.id);
+
+    const etiquetaPdfBase64 = await this.notasFiscaisCigamService.buscarEtiquetaPdf(id);
+
+    if (!etiquetaPdfBase64) {
+      res.status(404).json({
+        success: false,
+        message: 'Esta NF-e não tem etiqueta PDF salva.',
+      });
+      return;
+    }
+
+    const buffer = Buffer.from(etiquetaPdfBase64, 'base64');
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="etiqueta-${id}.pdf"`);
+    res.status(200).send(buffer);
   }
 
   buscarPorId = async (req: Request, res: Response): Promise<void> => {

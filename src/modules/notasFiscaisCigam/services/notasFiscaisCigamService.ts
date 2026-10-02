@@ -92,6 +92,7 @@ export class NotasFiscaisCigamService {
       chave_acesso: input.chaveAcessoNfe,
       enviado_marketplace: false,
       xml_content: input.xml,
+      etiqueta_pdf: input.etiquetaPdfBase64,
     });
 
     logger.success(`[NF-E CIGAM] NF-e registrada com sucesso. ID: ${nota.id}`);
@@ -152,6 +153,15 @@ export class NotasFiscaisCigamService {
       throw new NotFoundError(`Nota fiscal com ID: ${id} não encontrada`);
     }
     return nota;
+  }
+
+  /** Busca o PDF (base64) da etiqueta salva junto com a nota, se houver. */
+  async buscarEtiquetaPdf(id: string): Promise<string | null> {
+    const nota = await this.notasFiscaisCigamRepository.findById(id);
+    if (!nota) {
+      throw new NotFoundError(`Nota fiscal com ID: ${id} não encontrada`);
+    }
+    return this.notasFiscaisCigamRepository.findEtiquetaPdf(id);
   }
 
   async findNotEnviadas(): Promise<ResponseNotaFiscalCigamDTO[]> {
