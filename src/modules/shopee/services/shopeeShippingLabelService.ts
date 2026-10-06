@@ -65,18 +65,26 @@ export class ShopeeShippingLabelService {
    *    diferente do passo 3.
    */
   async obterEtiqueta(orderSn: string): Promise<ShippingLabelResult> {
+    // Guarda o motivo específico de falha do batch_ship_order (fail_error/fail_message
+    // do item, não a mensagem genérica de topo tipo "All failed, please check
+    // result_list for detail") — usado depois pra explicar por que o tracking
+    // number nunca chegou, em vez de só dizer "tente novamente em instantes".
+    let motivoFalhaShipOrder: string | undefined;
+
     try {
       const shipResponse = await this.httpClient.post<any>('/logistics/batch_ship_order', {
         order_list: [{ order_sn: orderSn }],
       });
       const shipItem = getResultItem(shipResponse, orderSn);
       if (shipResponse.error || shipItem?.fail_error) {
+        motivoFalhaShipOrder = shipItem?.fail_message || shipItem?.fail_error || shipResponse.message || shipResponse.error;
         logger.warn(
-          `[SHOPEE LABEL] batch_ship_order retornou aviso para ${orderSn}: ${shipResponse.message || shipResponse.error || shipItem?.fail_message}`
+          `[SHOPEE LABEL] batch_ship_order retornou aviso para ${orderSn} — item: ${shipItem?.fail_error ?? 'n/a'} / ${shipItem?.fail_message ?? 'n/a'} | topo: ${shipResponse.message ?? shipResponse.error ?? 'n/a'}`
         );
       }
     } catch (error: any) {
       // Pedido já confirmado anteriormente também pode cair aqui — não bloqueia o fluxo.
+      motivoFalhaShipOrder = error.message;
       logger.warn(`[SHOPEE LABEL] batch_ship_order falhou para ${orderSn} (seguindo mesmo assim): ${error.message}`);
     }
 
@@ -97,10 +105,13 @@ export class ShopeeShippingLabelService {
     }
 
     if (!trackingNumber) {
+      const sufixoMotivo = motivoFalhaShipOrder
+        ? ` Motivo reportado pela Shopee ao confirmar o envio: ${motivoFalhaShipOrder}`
+        : '';
       return {
         success: false,
         errorCode: 'NOT_PRINTABLE',
-        error: 'A Shopee ainda não atribuiu um código de rastreio a este pedido. Isso pode levar alguns minutos após a confirmação de envio — tente novamente em instantes.',
+        error: `A Shopee ainda não atribuiu um código de rastreio a este pedido. Isso pode levar alguns minutos após a confirmação de envio — tente novamente em instantes.${sufixoMotivo}`,
       };
     }
 
