@@ -39,6 +39,7 @@ describe('ShopeeShippingLabelService — fallback ship_order individual', () => 
     };
     mockOrderService = {
       buscarNumeroRastreio: vi.fn(),
+      buscarDetalhesPedido: vi.fn().mockResolvedValue([{ package_list: [], shipping_carrier: undefined }]),
     };
 
     service = new ShopeeShippingLabelService(mockHttpClient, mockOrderService);
@@ -116,5 +117,23 @@ describe('ShopeeShippingLabelService — fallback ship_order individual', () => 
     expect(resultado.success).toBe(false);
     expect(resultado.error).toContain('Fallback ship_order individual também falhou');
     expect(resultado.error).toContain('SHOPEE_SENDER_NAME não configurado');
+  });
+
+  it('deve repassar o package_number do pedido pra buscarNumeroRastreio', async () => {
+    mockHttpClient.post.mockImplementation((path: string) => {
+      if (path === '/logistics/batch_ship_order') return Promise.resolve({ response: { result_list: [] } });
+      if (path === '/logistics/create_shipping_document') return Promise.reject(new Error('parado de propósito'));
+      return Promise.reject(new Error(`chamada inesperada: ${path}`));
+    });
+    mockOrderService.buscarDetalhesPedido.mockResolvedValue([{
+      package_list: [{ package_number: 'OFG244945648184026' }],
+      shipping_carrier: 'Shopee Xpress',
+    }]);
+    mockOrderService.buscarNumeroRastreio.mockResolvedValue({ trackingNumber: 'BR123456789', shippingCarrier: 'Shopee Xpress' });
+
+    await service.obterEtiqueta('ORDER1');
+
+    expect(mockOrderService.buscarDetalhesPedido).toHaveBeenCalledWith(['ORDER1']);
+    expect(mockOrderService.buscarNumeroRastreio).toHaveBeenCalledWith('ORDER1', 'OFG244945648184026');
   });
 });

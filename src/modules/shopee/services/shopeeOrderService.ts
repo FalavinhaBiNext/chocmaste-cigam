@@ -123,12 +123,15 @@ export class ShopeeOrderService {
     return response.response?.order_list || [];
   }
 
-  async buscarNumeroRastreio(orderSn: string): Promise<{ trackingNumber: string; shippingCarrier: string }> {
-    logger.info(`[SHOPEE] Buscando número de rastreio do pedido ${orderSn}`);
+  async buscarNumeroRastreio(orderSn: string, packageNumber?: string): Promise<{ trackingNumber: string; shippingCarrier: string }> {
+    logger.info(`[SHOPEE] Buscando número de rastreio do pedido ${orderSn}${packageNumber ? ` (package_number=${packageNumber})` : ''}`);
 
-    const response = await this.httpClient.get<any>('/logistics/get_tracking_number', {
-      order_sn: orderSn,
-    });
+    const params: Record<string, any> = { order_sn: orderSn };
+    if (packageNumber) {
+      params.package_number = packageNumber;
+    }
+
+    const response = await this.httpClient.get<any>('/logistics/get_tracking_number', params);
 
     if (response.error) {
       throw new Error(`Erro Shopee: ${response.message || response.error}`);

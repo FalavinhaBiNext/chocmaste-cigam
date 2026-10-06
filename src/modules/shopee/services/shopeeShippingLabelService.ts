@@ -182,13 +182,27 @@ export class ShopeeShippingLabelService {
       }
     }
 
+    // A Shopee pode exigir o package_number pra resolver o tracking number de
+    // pedidos com pacote(s) específico(s) — sem ele, get_tracking_number pode
+    // voltar vazio mesmo com o pacote já em LOGISTICS_READY do lado da Shopee.
+    let packageNumber: string | undefined;
+    try {
+      const [pedido] = await this.orderService.buscarDetalhesPedido([orderSn]);
+      packageNumber = (pedido as any)?.package_list?.[0]?.package_number;
+      if (packageNumber) {
+        logger.info(`[SHOPEE LABEL] Pedido ${orderSn} tem package_number=${packageNumber} (canal: ${(pedido as any)?.shipping_carrier ?? 'n/a'})`);
+      }
+    } catch (error: any) {
+      logger.warn(`[SHOPEE LABEL] Falha ao buscar package_number do pedido ${orderSn} (seguindo sem ele): ${error.message}`);
+    }
+
     let trackingNumber: string | undefined;
     for (let attempt = 0; attempt < TRACKING_POLL_ATTEMPTS; attempt++) {
       if (attempt > 0) {
         await new Promise((resolve) => setTimeout(resolve, TRACKING_POLL_DELAY_MS));
       }
       try {
-        const tracking = await this.orderService.buscarNumeroRastreio(orderSn);
+        const tracking = await this.orderService.buscarNumeroRastreio(orderSn, packageNumber);
         if (tracking.trackingNumber) {
           trackingNumber = tracking.trackingNumber;
           break;
