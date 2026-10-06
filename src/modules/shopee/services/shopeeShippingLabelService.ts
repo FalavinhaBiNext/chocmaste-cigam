@@ -9,6 +9,13 @@ const TRACKING_POLL_DELAY_MS = 2000;
 const DOCUMENT_POLL_ATTEMPTS = 3;
 const DOCUMENT_POLL_DELAY_MS = 2000;
 
+/**
+ * batch_ship_order só funciona pro canal logístico 90003 (padrão das lojas BR).
+ * Pedidos em outros canais retornam esse tipo de mensagem e precisam do
+ * endpoint singular v2.logistics.ship_order como fallback.
+ */
+const BATCH_NAO_SUPORTADO_PATTERN = /can'?t batch ship|batch ship order|do(?:es)? not support batch/i;
+
 export interface ShippingLabelResult {
   success: boolean;
   buffer?: Buffer;
@@ -52,6 +59,76 @@ export class ShopeeShippingLabelService {
   ) {}
 
   /**
+   * Fallback para pedidos cujo canal logístico não aceita batch_ship_order.
+   * Fluxo: v2.logistics.get_shipping_parameter (descobre se é pickup ou dropoff
+   * e os IDs necessários) → v2.logistics.ship_order (confirma com esses IDs).
+   * Dropoff exige sender_real_name, que a Shopee não devolve — vem da env
+   * SHOPEE_SENDER_NAME (nome do remetente cadastrado na loja).
+   */
+  private async confirmarEnvioIndividual(orderSn: string): Promise<{ success: boolean; error?: string }> {
+    let paramResponse: any;
+    try {
+      paramResponse = await this.httpClient.get<any>('/logistics/get_shipping_parameter', {
+        order_sn: orderSn,
+      });
+    } catch (error: any) {
+      return { success: false, error: `Falha ao consultar get_shipping_parameter: ${error.message}` };
+    }
+
+    if (paramResponse.error) {
+      return { success: false, error: paramResponse.message || paramResponse.error };
+    }
+
+    const info = paramResponse.response?.info_needed || {};
+    const body: Record<string, any> = { order_sn: orderSn };
+
+    if (info.pickup) {
+      const address = paramResponse.response?.pickup?.address_list?.[0];
+      const pickupTimeId = address?.time_slot_list?.[0]?.pickup_time_id;
+      if (!address || !pickupTimeId) {
+        return {
+          success: false,
+          error: 'A Shopee exige coleta (pickup) para este pedido, mas não retornou endereço/horário disponível.',
+        };
+      }
+      body.pickup = { address_id: address.address_id, pickup_time_id: pickupTimeId };
+    } else if (info.dropoff) {
+      const branch = paramResponse.response?.dropoff?.branch_list?.[0];
+      if (!branch) {
+        return {
+          success: false,
+          error: 'A Shopee exige postagem (dropoff) para este pedido, mas não retornou nenhum ponto de entrega disponível.',
+        };
+      }
+      const senderName = process.env.SHOPEE_SENDER_NAME;
+      if (!senderName) {
+        return {
+          success: false,
+          error: 'SHOPEE_SENDER_NAME não configurado no servidor (necessário para confirmar postagem/dropoff deste pedido).',
+        };
+      }
+      body.dropoff = { branch_id: branch.branch_id, sender_real_name: senderName };
+    } else {
+      return {
+        success: false,
+        error: 'A Shopee não indicou um método de envio (pickup/dropoff) suportado para este pedido via get_shipping_parameter.',
+      };
+    }
+
+    try {
+      const shipResponse = await this.httpClient.post<any>('/logistics/ship_order', body);
+      if (shipResponse.error) {
+        return { success: false, error: shipResponse.message || shipResponse.error };
+      }
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+
+    logger.success(`[SHOPEE LABEL] ship_order (individual) confirmado com sucesso para ${orderSn}`);
+    return { success: true };
+  }
+
+  /**
    * Fluxo completo de emissão de etiqueta (confirmado contra a doc oficial da Shopee):
    * 1. batch_ship_order — confirma o envio do pedido. Lojas do Brasil usam o endpoint
    *    em lote (canal logístico 90003), não o v2.logistics.ship_order singular.
@@ -86,6 +163,17 @@ export class ShopeeShippingLabelService {
       // Pedido já confirmado anteriormente também pode cair aqui — não bloqueia o fluxo.
       motivoFalhaShipOrder = error.message;
       logger.warn(`[SHOPEE LABEL] batch_ship_order falhou para ${orderSn} (seguindo mesmo assim): ${error.message}`);
+    }
+
+    if (motivoFalhaShipOrder && BATCH_NAO_SUPORTADO_PATTERN.test(motivoFalhaShipOrder)) {
+      logger.info(`[SHOPEE LABEL] Canal logístico de ${orderSn} não aceita batch_ship_order — tentando ship_order individual...`);
+      const fallback = await this.confirmarEnvioIndividual(orderSn);
+      if (fallback.success) {
+        motivoFalhaShipOrder = undefined;
+      } else {
+        logger.warn(`[SHOPEE LABEL] Fallback ship_order individual também falhou para ${orderSn}: ${fallback.error}`);
+        motivoFalhaShipOrder = `${motivoFalhaShipOrder} | Fallback ship_order individual também falhou: ${fallback.error}`;
+      }
     }
 
     let trackingNumber: string | undefined;
