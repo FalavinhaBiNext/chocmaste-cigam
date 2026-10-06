@@ -79,6 +79,8 @@ export class ShopeeShippingLabelService {
       return { success: false, error: paramResponse.message || paramResponse.error };
     }
 
+    logger.info(`[SHOPEE LABEL] get_shipping_parameter de ${orderSn}: ${JSON.stringify(paramResponse)}`);
+
     const info = paramResponse.response?.info_needed || {};
     const body: Record<string, any> = { order_sn: orderSn };
 
