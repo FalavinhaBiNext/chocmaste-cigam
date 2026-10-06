@@ -65,12 +65,14 @@ export class ShopeeShippingLabelService {
    * Dropoff exige sender_real_name, que a Shopee não devolve — vem da env
    * SHOPEE_SENDER_NAME (nome do remetente cadastrado na loja).
    */
-  private async confirmarEnvioIndividual(orderSn: string): Promise<{ success: boolean; error?: string }> {
+  private async confirmarEnvioIndividual(orderSn: string, packageNumber?: string): Promise<{ success: boolean; error?: string }> {
     let paramResponse: any;
     try {
-      paramResponse = await this.httpClient.get<any>('/logistics/get_shipping_parameter', {
-        order_sn: orderSn,
-      });
+      const params: Record<string, any> = { order_sn: orderSn };
+      if (packageNumber) {
+        params.package_number = packageNumber;
+      }
+      paramResponse = await this.httpClient.get<any>('/logistics/get_shipping_parameter', params);
     } catch (error: any) {
       return { success: false, error: `Falha ao consultar get_shipping_parameter: ${error.message}` };
     }
@@ -148,6 +150,20 @@ export class ShopeeShippingLabelService {
    *    diferente do passo 3.
    */
   async obterEtiqueta(orderSn: string): Promise<ShippingLabelResult> {
+    // Buscado logo no início porque tanto o fallback de ship_order individual
+    // quanto a consulta de tracking number podem depender do package_number
+    // (pedidos com pacote específico) pra resolver corretamente na Shopee.
+    let packageNumber: string | undefined;
+    try {
+      const [pedido] = await this.orderService.buscarDetalhesPedido([orderSn]);
+      packageNumber = (pedido as any)?.package_list?.[0]?.package_number;
+      if (packageNumber) {
+        logger.info(`[SHOPEE LABEL] Pedido ${orderSn} tem package_number=${packageNumber} (canal: ${(pedido as any)?.shipping_carrier ?? 'n/a'})`);
+      }
+    } catch (error: any) {
+      logger.warn(`[SHOPEE LABEL] Falha ao buscar package_number do pedido ${orderSn} (seguindo sem ele): ${error.message}`);
+    }
+
     // Guarda o motivo específico de falha do batch_ship_order (fail_error/fail_message
     // do item, não a mensagem genérica de topo tipo "All failed, please check
     // result_list for detail") — usado depois pra explicar por que o tracking
@@ -173,27 +189,13 @@ export class ShopeeShippingLabelService {
 
     if (motivoFalhaShipOrder && BATCH_NAO_SUPORTADO_PATTERN.test(motivoFalhaShipOrder)) {
       logger.info(`[SHOPEE LABEL] Canal logístico de ${orderSn} não aceita batch_ship_order — tentando ship_order individual...`);
-      const fallback = await this.confirmarEnvioIndividual(orderSn);
+      const fallback = await this.confirmarEnvioIndividual(orderSn, packageNumber);
       if (fallback.success) {
         motivoFalhaShipOrder = undefined;
       } else {
         logger.warn(`[SHOPEE LABEL] Fallback ship_order individual também falhou para ${orderSn}: ${fallback.error}`);
         motivoFalhaShipOrder = `${motivoFalhaShipOrder} | Fallback ship_order individual também falhou: ${fallback.error}`;
       }
-    }
-
-    // A Shopee pode exigir o package_number pra resolver o tracking number de
-    // pedidos com pacote(s) específico(s) — sem ele, get_tracking_number pode
-    // voltar vazio mesmo com o pacote já em LOGISTICS_READY do lado da Shopee.
-    let packageNumber: string | undefined;
-    try {
-      const [pedido] = await this.orderService.buscarDetalhesPedido([orderSn]);
-      packageNumber = (pedido as any)?.package_list?.[0]?.package_number;
-      if (packageNumber) {
-        logger.info(`[SHOPEE LABEL] Pedido ${orderSn} tem package_number=${packageNumber} (canal: ${(pedido as any)?.shipping_carrier ?? 'n/a'})`);
-      }
-    } catch (error: any) {
-      logger.warn(`[SHOPEE LABEL] Falha ao buscar package_number do pedido ${orderSn} (seguindo sem ele): ${error.message}`);
     }
 
     let trackingNumber: string | undefined;
