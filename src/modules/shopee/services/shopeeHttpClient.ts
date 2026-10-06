@@ -183,12 +183,13 @@ export class ShopeeHttpClient {
       ...extraParams,
     };
 
+    let buffer: Buffer;
     try {
       const response = await axios.post(`${getShopeeApiBase()}${path}`, body, {
         params,
         responseType: 'arraybuffer',
       });
-      return Buffer.from(response.data);
+      buffer = Buffer.from(response.data);
     } catch (error: any) {
       let errorMsg = error.message;
       let errorCode: string | undefined;
@@ -201,5 +202,24 @@ export class ShopeeHttpClient {
       }
       throw new Error(`Erro na API Shopee [${errorCode}]: ${errorMsg}`);
     }
+
+    // A Shopee pode responder 200 com um corpo JSON de erro em vez do PDF
+    // (ex.: documento ainda não está pronto de fato, apesar do status "READY"
+    // reportado antes). Sem essa checagem, o buffer inválido só falha depois,
+    // no merge/parse do PDF, com um erro genérico que não aponta a causa real.
+    if (!buffer.subarray(0, 5).toString('latin1').startsWith('%PDF-')) {
+      let errorMsg = 'Resposta da Shopee não é um PDF válido.';
+      let errorCode: string | undefined;
+      try {
+        const parsed = JSON.parse(buffer.toString('utf-8'));
+        errorMsg = parsed?.message || errorMsg;
+        errorCode = parsed?.error;
+      } catch {
+        // corpo não era JSON nem PDF — mantém mensagem genérica
+      }
+      throw new Error(`Erro na API Shopee [${errorCode}]: ${errorMsg}`);
+    }
+
+    return buffer;
   }
 }
