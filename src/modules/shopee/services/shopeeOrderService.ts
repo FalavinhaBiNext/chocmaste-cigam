@@ -108,8 +108,12 @@ export class ShopeeOrderService {
   async buscarDetalhesPedido(orderSnList: string[]): Promise<ShopeeOrderDetail[]> {
     logger.info(`[SHOPEE] Buscando detalhes de ${orderSnList.length} pedido(s): ${orderSnList.join(', ')}`);
 
+    // response_optional_fields precisa ser pedido explicitamente — por padrão a
+    // Shopee não devolve shipping_carrier/package_list, mesmo esses campos
+    // existindo na interface de resposta documentada.
     const response = await this.httpClient.get<any>('/order/get_order_detail', {
       order_sn_list: orderSnList.join(','),
+      response_optional_fields: 'shipping_carrier,package_list',
     });
 
     if (response.error) {
