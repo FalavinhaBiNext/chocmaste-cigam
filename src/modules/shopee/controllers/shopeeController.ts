@@ -416,6 +416,34 @@ export class ShopeeController {
   }
 
   /**
+   * Diagnóstico — lista os canais logísticos habilitados na loja.
+   * GET /shopee/logistics/channels
+   */
+  getLogisticsChannels = async (_req: Request, res: Response): Promise<void> => {
+    try {
+      const data = await this.orderService.listarCanaisLogisticos();
+      res.status(200).json({ success: true, data });
+    } catch (error: any) {
+      logger.error(`[SHOPEE] Erro ao listar canais logísticos: ${error.message}`);
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  /**
+   * Diagnóstico — lista os endereços de coleta (pickup) cadastrados na loja.
+   * GET /shopee/logistics/addresses
+   */
+  getPickupAddresses = async (_req: Request, res: Response): Promise<void> => {
+    try {
+      const data = await this.orderService.listarEnderecosColeta();
+      res.status(200).json({ success: true, data });
+    } catch (error: any) {
+      logger.error(`[SHOPEE] Erro ao listar endereços de coleta: ${error.message}`);
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  /**
    * Gera e baixa a etiqueta de envio de um pedido da Shopee.
    * GET /shopee/orders/:orderSn/shipping-label
    */

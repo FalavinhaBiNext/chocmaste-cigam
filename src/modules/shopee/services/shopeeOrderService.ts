@@ -164,4 +164,37 @@ export class ShopeeOrderService {
       events,
     };
   }
+
+  /**
+   * Lista os canais logísticos habilitados na loja (v2.logistics.get_channel_list).
+   * Diagnóstico — usado pra entender por que um canal específico não aceita
+   * batch_ship_order ou não retorna pontos de dropoff/pickup.
+   */
+  async listarCanaisLogisticos(): Promise<any> {
+    logger.info('[SHOPEE] Listando canais logísticos (get_channel_list)');
+
+    const response = await this.httpClient.get<any>('/logistics/get_channel_list');
+
+    if (response.error) {
+      throw new Error(`Erro Shopee: ${response.message || response.error}`);
+    }
+
+    return response.response;
+  }
+
+  /**
+   * Lista os endereços de coleta cadastrados na loja (v2.logistics.get_address_list).
+   * Diagnóstico — confirma se a loja tem endereço de pickup configurado.
+   */
+  async listarEnderecosColeta(): Promise<any> {
+    logger.info('[SHOPEE] Listando endereços de coleta (get_address_list)');
+
+    const response = await this.httpClient.get<any>('/logistics/get_address_list');
+
+    if (response.error) {
+      throw new Error(`Erro Shopee: ${response.message || response.error}`);
+    }
+
+    return response.response;
+  }
 }

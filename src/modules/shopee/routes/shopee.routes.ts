@@ -14,6 +14,10 @@ export function createShopeeRoutes(controller: ShopeeController): Router {
   router.delete('/tokens/:id', asyncHandler(controller.deleteToken));
   router.patch('/tokens/:id/activate', asyncHandler(controller.activateToken));
 
+  // Diagnóstico (somente leitura)
+  router.get('/logistics/channels', asyncHandler(controller.getLogisticsChannels));
+  router.get('/logistics/addresses', asyncHandler(controller.getPickupAddresses));
+
   // Pedidos
   router.get('/orders', asyncHandler(controller.listOrders));
   router.post('/orders/:orderSn/send-invoice', asyncHandler(controller.sendInvoice));
