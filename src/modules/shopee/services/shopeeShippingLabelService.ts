@@ -80,6 +80,10 @@ export class ShopeeShippingLabelService {
     }
 
     logger.info(`[SHOPEE LABEL] get_shipping_parameter de ${orderSn}: ${JSON.stringify(paramResponse)}`);
+    // Preview também incluído nas mensagens de erro abaixo (não só no log do
+    // servidor) porque o acesso ao log do servidor nem sempre está à mão de
+    // quem está depurando isso pelo retorno da própria chamada.
+    const rawPreview = JSON.stringify(paramResponse).slice(0, 800);
 
     const info = paramResponse.response?.info_needed || {};
     const body: Record<string, any> = { order_sn: orderSn };
@@ -90,7 +94,7 @@ export class ShopeeShippingLabelService {
       if (!address || !pickupTimeId) {
         return {
           success: false,
-          error: 'A Shopee exige coleta (pickup) para este pedido, mas não retornou endereço/horário disponível.',
+          error: `A Shopee exige coleta (pickup) para este pedido, mas não retornou endereço/horário disponível. Resposta bruta: ${rawPreview}`,
         };
       }
       body.pickup = { address_id: address.address_id, pickup_time_id: pickupTimeId };
@@ -99,7 +103,7 @@ export class ShopeeShippingLabelService {
       if (!branch) {
         return {
           success: false,
-          error: 'A Shopee exige postagem (dropoff) para este pedido, mas não retornou nenhum ponto de entrega disponível.',
+          error: `A Shopee exige postagem (dropoff) para este pedido, mas não retornou nenhum ponto de entrega disponível. Resposta bruta: ${rawPreview}`,
         };
       }
       const senderName = process.env.SHOPEE_SENDER_NAME;
@@ -113,7 +117,7 @@ export class ShopeeShippingLabelService {
     } else {
       return {
         success: false,
-        error: 'A Shopee não indicou um método de envio (pickup/dropoff) suportado para este pedido via get_shipping_parameter.',
+        error: `A Shopee não indicou um método de envio (pickup/dropoff) suportado para este pedido via get_shipping_parameter. Resposta bruta: ${rawPreview}`,
       };
     }
 
