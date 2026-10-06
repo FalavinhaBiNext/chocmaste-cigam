@@ -208,6 +208,9 @@ export class ShopeeHttpClient {
     // reportado antes). Sem essa checagem, o buffer inválido só falha depois,
     // no merge/parse do PDF, com um erro genérico que não aponta a causa real.
     if (!buffer.subarray(0, 5).toString('latin1').startsWith('%PDF-')) {
+      const preview = buffer.subarray(0, 500).toString('utf-8');
+      logger.error(`[SHOPEE] postBinary(${path}) não retornou um PDF — ${buffer.length} byte(s). Conteúdo bruto (até 500 chars): ${preview}`);
+
       let errorMsg = 'Resposta da Shopee não é um PDF válido.';
       let errorCode: string | undefined;
       try {
