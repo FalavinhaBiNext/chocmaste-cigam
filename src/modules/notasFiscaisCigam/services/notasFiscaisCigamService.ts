@@ -20,6 +20,8 @@ export type EtiquetaCombinadaResult =
   | { success: true; buffer: Buffer; filename: string }
   | { success: false; message: string };
 
+export type ModoEtiqueta = 'cigam' | 'marketplace' | 'ambos';
+
 @injectable()
 export class NotasFiscaisCigamService {
   constructor(
@@ -170,16 +172,17 @@ export class NotasFiscaisCigamService {
   }
 
   /**
-   * Busca a etiqueta "completa" de uma nota: a etiqueta de envio do marketplace
-   * (ML/Shopee/Tray) juntada num só PDF com a etiqueta/relatório que o ERP já
-   * enviou junto com a NF-e (campo etiqueta_pdf), quando ela existir.
-   * - Marketplace com integração de etiqueta, mas busca falhou/não liberada ainda:
-   *   retorna erro (não baixa só metade do documento).
-   * - Sem PDF do ERP salvo: devolve só a etiqueta do marketplace.
-   * - Marketplace sem integração de etiqueta nenhuma (ex.: bling, sem vínculo):
-   *   devolve só o PDF do ERP, se existir.
+   * Busca a etiqueta de uma nota, no modo escolhido pelo usuário:
+   * - 'cigam': só o PDF que o ERP enviou junto com a NF-e (campo etiqueta_pdf).
+   * - 'marketplace': só a etiqueta de envio do marketplace (ML/Shopee/Tray).
+   * - 'ambos' (padrão): junta as duas num só PDF, quando ambas existirem.
+   *   Marketplace com integração de etiqueta, mas busca falhou/não liberada
+   *   ainda: retorna erro (não baixa só metade do documento). Sem PDF do ERP
+   *   salvo: devolve só a etiqueta do marketplace. Marketplace sem integração
+   *   de etiqueta nenhuma (ex.: bling, sem vínculo): devolve só o PDF do ERP,
+   *   se existir.
    */
-  async buscarEtiquetaCombinada(id: string): Promise<EtiquetaCombinadaResult> {
+  async buscarEtiquetaCombinada(id: string, modo: ModoEtiqueta = 'ambos'): Promise<EtiquetaCombinadaResult> {
     const nota = await this.notasFiscaisCigamRepository.findById(id);
     if (!nota) {
       throw new NotFoundError(`Nota fiscal com ID: ${id} não encontrada`);
@@ -188,10 +191,73 @@ export class NotasFiscaisCigamService {
     const etiquetaPdfErpBase64 = await this.notasFiscaisCigamRepository.findEtiquetaPdf(id);
     const erpPdf = etiquetaPdfErpBase64 ? Buffer.from(etiquetaPdfErpBase64, 'base64') : null;
 
-    // "temIntegracaoEtiqueta" distingue "o marketplace tem uma forma de buscar
-    // etiqueta, mas falhou/ainda não está pronta" (deve bloquear, sem baixar nada
-    // pela metade) de "esse marketplace nunca teve uma integração de etiqueta"
-    // (aí faz sentido cair pro PDF do ERP sozinho, se existir).
+    if (modo === 'cigam') {
+      if (!erpPdf) {
+        return {
+          success: false,
+          message: 'Esta NF-e não tem um PDF de etiqueta enviado pelo CIGAM.',
+        };
+      }
+      return { success: true, buffer: erpPdf, filename: `etiqueta-cigam-${nota.numero_pedido_cigam}.pdf` };
+    }
+
+    const { buffer: marketplaceBuffer, temIntegracaoEtiqueta, error: marketplaceError } =
+      await this.buscarEtiquetaMarketplace(nota);
+
+    if (modo === 'marketplace') {
+      if (!marketplaceBuffer) {
+        return {
+          success: false,
+          message: marketplaceError
+            || (temIntegracaoEtiqueta
+              ? 'Não foi possível obter a etiqueta do marketplace.'
+              : 'Esta NF-e não está vinculada a um marketplace com integração de etiqueta.'),
+        };
+      }
+      return { success: true, buffer: marketplaceBuffer, filename: `etiqueta-marketplace-${nota.numero_pedido_cigam}.pdf` };
+    }
+
+    // modo === 'ambos'
+    if (!marketplaceBuffer) {
+      if (temIntegracaoEtiqueta) {
+        // O marketplace tem integração de etiqueta, mas a busca falhou (ainda
+        // processando, não liberada etc.) — não baixa nada pela metade, só o
+        // PDF do ERP sozinho teria menos valor do que a mensagem de erro real.
+        return {
+          success: false,
+          message: marketplaceError || 'Não foi possível obter a etiqueta do marketplace.',
+        };
+      }
+
+      // Marketplace nulo/sem integração de etiqueta (ex.: bling, ou nota ainda
+      // sem marketplace vinculado) — nunca haveria etiqueta de marketplace pra
+      // esperar, então o PDF do ERP sozinho é o resultado esperado.
+      if (erpPdf) {
+        return { success: true, buffer: erpPdf, filename: `etiqueta-${nota.numero_pedido_cigam}.pdf` };
+      }
+      return {
+        success: false,
+        message: 'Nenhuma etiqueta disponível para esta NF-e.',
+      };
+    }
+
+    if (!erpPdf) {
+      return { success: true, buffer: marketplaceBuffer, filename: `etiqueta-${nota.numero_pedido_cigam}.pdf` };
+    }
+
+    const combinado = await mergePdfBuffers([marketplaceBuffer, erpPdf]);
+    return { success: true, buffer: combinado, filename: `etiqueta-combinada-${nota.numero_pedido_cigam}.pdf` };
+  }
+
+  /**
+   * "temIntegracaoEtiqueta" distingue "o marketplace tem uma forma de buscar
+   * etiqueta, mas falhou/ainda não está pronta" (deve bloquear, sem baixar nada
+   * pela metade) de "esse marketplace nunca teve uma integração de etiqueta"
+   * (aí faz sentido cair pro PDF do ERP sozinho, se existir).
+   */
+  private async buscarEtiquetaMarketplace(
+    nota: ResponseNotaFiscalCigamDTO,
+  ): Promise<{ buffer: Buffer | null; temIntegracaoEtiqueta: boolean; error?: string }> {
     let temIntegracaoEtiqueta = false;
     let marketplaceBuffer: Buffer | null = null;
     let marketplaceError: string | undefined;
@@ -233,35 +299,7 @@ export class NotasFiscaisCigamService {
       }
     }
 
-    if (!marketplaceBuffer) {
-      if (temIntegracaoEtiqueta) {
-        // O marketplace tem integração de etiqueta, mas a busca falhou (ainda
-        // processando, não liberada etc.) — não baixa nada pela metade, só o
-        // PDF do ERP sozinho teria menos valor do que a mensagem de erro real.
-        return {
-          success: false,
-          message: marketplaceError || 'Não foi possível obter a etiqueta do marketplace.',
-        };
-      }
-
-      // Marketplace nulo/sem integração de etiqueta (ex.: bling, ou nota ainda
-      // sem marketplace vinculado) — nunca haveria etiqueta de marketplace pra
-      // esperar, então o PDF do ERP sozinho é o resultado esperado.
-      if (erpPdf) {
-        return { success: true, buffer: erpPdf, filename: `etiqueta-${nota.numero_pedido_cigam}.pdf` };
-      }
-      return {
-        success: false,
-        message: 'Nenhuma etiqueta disponível para esta NF-e.',
-      };
-    }
-
-    if (!erpPdf) {
-      return { success: true, buffer: marketplaceBuffer, filename: `etiqueta-${nota.numero_pedido_cigam}.pdf` };
-    }
-
-    const combinado = await mergePdfBuffers([marketplaceBuffer, erpPdf]);
-    return { success: true, buffer: combinado, filename: `etiqueta-combinada-${nota.numero_pedido_cigam}.pdf` };
+    return { buffer: marketplaceBuffer, temIntegracaoEtiqueta, error: marketplaceError };
   }
 
   async findNotEnviadas(): Promise<ResponseNotaFiscalCigamDTO[]> {

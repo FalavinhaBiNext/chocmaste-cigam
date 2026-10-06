@@ -1,6 +1,6 @@
 import { injectable, inject } from 'tsyringe';
 import { Request, Response } from 'express';
-import { NotasFiscaisCigamService } from '../services/notasFiscaisCigamService';
+import { NotasFiscaisCigamService, ModoEtiqueta } from '../services/notasFiscaisCigamService';
 import { CigamNfeRoutingService } from '../services/cigamNfeRoutingService';
 import { validateReceberNotaFiscalBody } from '../notasFiscaisCigam.validator';
 import { logger } from '@/shared/utils/logger';
@@ -93,15 +93,20 @@ export class NotasFiscaisCigamController {
   }
 
   /**
-   * Baixa a etiqueta "completa" da nota: a etiqueta de envio do marketplace
-   * (ML/Shopee/Tray) juntada com o PDF que o ERP enviou junto com a NF-e,
-   * quando ambos existirem.
-   * GET /notas-fiscais-cigam/:id/etiqueta
+   * Baixa a etiqueta da nota no modo escolhido via query string (?modo=):
+   * 'cigam' (só o PDF do ERP), 'marketplace' (só a etiqueta do marketplace) ou
+   * 'ambos' (padrão — junta as duas, quando ambas existirem).
+   * GET /notas-fiscais-cigam/:id/etiqueta?modo=cigam|marketplace|ambos
    */
   baixarEtiqueta = async (req: Request, res: Response): Promise<void> => {
     const id = String(req.params.id);
+    const modoParam = String(req.query.modo || 'ambos');
 
-    const resultado = await this.notasFiscaisCigamService.buscarEtiquetaCombinada(id);
+    if (!['cigam', 'marketplace', 'ambos'].includes(modoParam)) {
+      throw new ValidationError('Parâmetro modo inválido. Use "cigam", "marketplace" ou "ambos".');
+    }
+
+    const resultado = await this.notasFiscaisCigamService.buscarEtiquetaCombinada(id, modoParam as ModoEtiqueta);
 
     if (!resultado.success) {
       res.status(400).json({
