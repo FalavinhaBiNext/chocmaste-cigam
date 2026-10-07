@@ -14,12 +14,15 @@ import { logger } from '@/shared/utils/logger';
 import { delay } from '@/shared/utils/delay';
 
 // Mesmos fallbacks fixos de id_loja do Bling usados em webhookService.ts pra
-// identificar o Mercado Livre quando o canal ainda não está sincronizado em
+// identificar o marketplace quando o canal ainda não está sincronizado em
 // canal_vendas.
 const MERCADO_LIVRE_ID_LOJA_FALLBACK = '203347320';
-// Transportadora cadastrada no CIGAM pra representar o "Mercado Envios" quando
-// o pedido do Mercado Livre chega sem transportadora vinculada (id 0/ausente).
+const SHOPEE_ID_LOJA_FALLBACK = '204961504';
+// Transportadoras cadastradas no CIGAM pra representar o transporte padrão de
+// cada marketplace quando o pedido chega sem transportadora vinculada (id 0/ausente) —
+// caso do "Mercado Envios" (Mercado Livre) e do transporte padrão da Shopee.
 const MERCADO_LIVRE_TRANSPORTADORA_CIGAM_ID = '374';
+const SHOPEE_TRANSPORTADORA_CIGAM_ID = '425';
 
 @injectable()
 export class CigamPedidoService {
@@ -84,22 +87,32 @@ export class CigamPedidoService {
     if (idTranspBling && idTranspBling !== 0 && idTranspBling !== '0') {
       idTransportadoraCigam = (await this.cigamTransportadoraService.obterOuCriarTransportadora(String(idTranspBling))).trim();
     } else {
-      // Pedidos do Mercado Livre com "Mercado Envios" chegam do Bling sem
-      // transportadora vinculada (id 0/ausente/""). Nesse caso, em vez de
-      // enviar o pedido ao CIGAM sem transportadora, força a transportadora
-      // padrão cadastrada no CIGAM pro Mercado Livre — mas só quando o canal
-      // de venda do pedido realmente for identificado como Mercado Livre.
+      // Pedidos do Mercado Livre ("Mercado Envios") e da Shopee (transporte
+      // próprio) chegam do Bling sem transportadora vinculada (id 0/ausente/"").
+      // Nesse caso, em vez de enviar o pedido ao CIGAM sem transportadora,
+      // força a transportadora padrão cadastrada no CIGAM pro marketplace —
+      // mas só quando o canal de venda do pedido realmente for identificado
+      // como Mercado Livre ou Shopee.
       const idLoja = pedidoBling.loja?.id ? String(pedidoBling.loja.id) : undefined;
       let ehMercadoLivre = idLoja === MERCADO_LIVRE_ID_LOJA_FALLBACK;
-      if (idLoja && !ehMercadoLivre) {
+      let ehShopee = idLoja === SHOPEE_ID_LOJA_FALLBACK;
+      if (idLoja && !ehMercadoLivre && !ehShopee) {
         const canalVenda = await this.canalVendaRepository.findByIdBling(idLoja);
-        ehMercadoLivre = (canalVenda?.tipo || '').toLowerCase().includes('mercado');
+        const tipoCanalNormalizado = (canalVenda?.tipo || '').toLowerCase();
+        ehMercadoLivre = tipoCanalNormalizado.includes('mercado');
+        ehShopee = tipoCanalNormalizado.includes('shopee');
       }
 
       if (ehMercadoLivre) {
         idTransportadoraCigam = MERCADO_LIVRE_TRANSPORTADORA_CIGAM_ID;
         logger.info(
           `Pedido sem transportadora válida, mas canal de venda (loja ${idLoja}) identificado como Mercado Livre. `
+          + `Forçando transportadora padrão do CIGAM: ${idTransportadoraCigam}.`
+        );
+      } else if (ehShopee) {
+        idTransportadoraCigam = SHOPEE_TRANSPORTADORA_CIGAM_ID;
+        logger.info(
+          `Pedido sem transportadora válida, mas canal de venda (loja ${idLoja}) identificado como Shopee. `
           + `Forçando transportadora padrão do CIGAM: ${idTransportadoraCigam}.`
         );
       } else {

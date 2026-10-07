@@ -336,9 +336,38 @@ describe('CigamPedidoService - Idempotência e Retomada', () => {
       );
     });
 
-    it('NÃO força a transportadora do Mercado Livre pra canais de venda de outros marketplaces', async () => {
+    it('usa a transportadora CIGAM 425 quando o id_loja bate com o fallback fixo da Shopee', async () => {
+      const pedido = { ...mockPedidoSemTransportadora, loja: { id: 204961504 } };
+
+      await service.enviarPedido(pedido, 'UN-01', undefined, null, 'event-uuid-1');
+
+      expect(canalVendaRepository.findByIdBling).not.toHaveBeenCalled();
+      expect(cigamHttpClient.post).toHaveBeenCalledWith(
+        'https://erp.cigam.test',
+        'producao',
+        '/API/api/comercial/fa/Pedido/Salvar',
+        expect.objectContaining({ CodigoTransportadora: '425' })
+      );
+    });
+
+    it('usa a transportadora CIGAM 425 quando o canal de venda cadastrado é do tipo Shopee', async () => {
       canalVendaRepository.findByIdBling.mockResolvedValue({ id_bling: '777', tipo: 'Shopee' });
       const pedido = { ...mockPedidoSemTransportadora, loja: { id: 777 } };
+
+      await service.enviarPedido(pedido, 'UN-01', undefined, null, 'event-uuid-1');
+
+      expect(canalVendaRepository.findByIdBling).toHaveBeenCalledWith('777');
+      expect(cigamHttpClient.post).toHaveBeenCalledWith(
+        'https://erp.cigam.test',
+        'producao',
+        '/API/api/comercial/fa/Pedido/Salvar',
+        expect.objectContaining({ CodigoTransportadora: '425' })
+      );
+    });
+
+    it('NÃO força transportadora de marketplace pra canais de venda de outros tipos (ex.: Tray/loja própria)', async () => {
+      canalVendaRepository.findByIdBling.mockResolvedValue({ id_bling: '888', tipo: 'Tray' });
+      const pedido = { ...mockPedidoSemTransportadora, loja: { id: 888 } };
 
       await service.enviarPedido(pedido, 'UN-01', undefined, null, 'event-uuid-1');
 
