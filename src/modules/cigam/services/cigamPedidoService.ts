@@ -12,6 +12,7 @@ import { PedidoService } from '@/modules/pedido/services/pedidoService';
 import { EventService } from '@/modules/events/services/eventService';
 import { logger } from '@/shared/utils/logger';
 import { delay } from '@/shared/utils/delay';
+import { calcularPercentualDesconto } from '@/shared/utils/desconto';
 
 // Mesmos fallbacks fixos de id_loja do Bling usados em webhookService.ts pra
 // identificar o marketplace quando o canal ainda não está sincronizado em
@@ -21,8 +22,8 @@ const SHOPEE_ID_LOJA_FALLBACK = '204961504';
 // Transportadoras cadastradas no CIGAM pra representar o transporte padrão de
 // cada marketplace quando o pedido chega sem transportadora vinculada (id 0/ausente) —
 // caso do "Mercado Envios" (Mercado Livre) e do transporte padrão da Shopee.
-const MERCADO_LIVRE_TRANSPORTADORA_CIGAM_ID = '374';
-const SHOPEE_TRANSPORTADORA_CIGAM_ID = '425';
+const MERCADO_LIVRE_TRANSPORTADORA_CIGAM_ID = '000374';
+const SHOPEE_TRANSPORTADORA_CIGAM_ID = '000425';
 
 @injectable()
 export class CigamPedidoService {
@@ -165,6 +166,11 @@ export class CigamPedidoService {
       ? (pedidoBling.desconto.valor ?? 0)
       : (Number(pedidoBling.desconto) || 0);
     const outrasDespesas = Number(pedidoBling.outrasDespesas) || 0;
+    // Base do percentual: total bruto dos produtos (antes do desconto). Se o
+    // Bling não enviar totalProdutos, usa a soma dos itens.
+    const totalProdutos = Number(pedidoBling.totalProdutos)
+      || itensMapeados.reduce((soma, item) => soma + (Number(item.valorTotal) || 0), 0);
+    const percentualDesconto = calcularPercentualDesconto(descontoValor, totalProdutos);
 
     // 6. Montar o payload da Capa do Pedido e criar apenas se não existir
     if (!codigoPedidoCigam) {
@@ -416,6 +422,7 @@ export class CigamPedidoService {
 
     const payloadPatchCigam = {
       valorDesconto: descontoValor,
+      percentualDesconto: percentualDesconto,
       valorFrete: valorFrete,
       valorEncargos: outrasDespesas,
     };

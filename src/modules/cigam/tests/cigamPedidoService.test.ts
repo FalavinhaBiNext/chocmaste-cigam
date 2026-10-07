@@ -155,7 +155,8 @@ describe('CigamPedidoService - Idempotência e Retomada', () => {
     // 5. Chamou PATCH de frete/desconto/encargos
     expect(axios.patch).toHaveBeenCalledWith(
       'https://erp.cigam.test/hub_pedido/api/pedidos/CIGAM-999',
-      expect.objectContaining({ valorFrete: 25.5, valorDesconto: 5, valorEncargos: 2 }),
+      // desconto 5 sobre itens de 30 + 20 = 50 → 10%
+      expect.objectContaining({ valorFrete: 25.5, valorDesconto: 5, percentualDesconto: 10, valorEncargos: 2 }),
       expect.anything()
     );
   });
