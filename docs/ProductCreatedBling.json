@@ -48,3 +48,32 @@
     "executionMode": "production"
   }
 ]
+
+{
+            "id": 14744018734,
+            "nome": "MERCADO ENVIOS SERVICOS DE LOGISTICA LTDA2.",
+            "codigo": "",
+            "situacao": "A",
+            "numeroDocumento": "20121850000315",
+            "telefone": "",
+            "celular": ""
+        },
+
+        {
+    "data": [
+        {
+            "id": 6642910471,
+            "nome": "Braspress Transportes Urgentes Ltda",
+            "codigo": "",
+            "situacao": "A",
+            "numeroDocumento": "48740351000327",
+            "telefone": "",
+            "celular": ""
+        }
+    ]
+}
+
+{
+            "id": 6175354653,
+            "descricao": "Transportador"
+        },

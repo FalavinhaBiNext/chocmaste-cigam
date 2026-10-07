@@ -371,15 +371,18 @@ export class CigamPedidoService {
     }
     const headersCigam = { 'X-Api-Key': hubPedidoApiKey };
 
+    const payloadPatchCigam = {
+      valorDesconto: descontoValor,
+      valorFrete: valorFrete,
+      valorEncargos: outrasDespesas,
+    };
+
     logger.success(`Pedido CIGAM #${codigoPedidoCigam} encontrado (${itensPedidoCigam.length} item(ns)). Atualizando frete, desconto e encargos...`);
     logger.info(`URL da requisição PATCH: ${urlPedidoCigam}`);
     logger.info(`X-Api-Key utilizada: ${hubPedidoApiKey.slice(0, 4)}...${hubPedidoApiKey.slice(-4)} (mascarada; ver observação abaixo)`);
+    logger.info(`Payload PATCH (frete/desconto/encargos) do pedido CIGAM #${codigoPedidoCigam}: ${JSON.stringify(payloadPatchCigam)}`);
     try {
-      await axios.patch(urlPedidoCigam, {
-        valorDesconto: descontoValor,
-        valorFrete: valorFrete,
-        valorEncargos: outrasDespesas,
-      }, { httpsAgent, headers: headersCigam });
+      await axios.patch(urlPedidoCigam, payloadPatchCigam, { httpsAgent, headers: headersCigam });
     } catch (error: any) {
       logger.error(
         `PATCH de valores (frete/desconto/encargos) falhou para o pedido CIGAM #${codigoPedidoCigam}: ` +
