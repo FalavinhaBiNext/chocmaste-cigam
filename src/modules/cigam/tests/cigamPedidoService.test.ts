@@ -12,6 +12,7 @@ describe('CigamPedidoService - Idempotência e Retomada', () => {
   let cigamHttpClient: any;
   let cigamClienteService: any;
   let cigamTransportadoraService: any;
+  let canalVendaRepository: any;
   let usuarioCigamService: any;
   let deParaFormasPagamentoRepo: any;
   let deParaProdutosRepo: any;
@@ -50,6 +51,10 @@ describe('CigamPedidoService - Idempotência e Retomada', () => {
       obterOuCriarTransportadora: vi.fn().mockResolvedValue('TRANSP-CIGAM-01'),
     };
 
+    canalVendaRepository = {
+      findByIdBling: vi.fn().mockResolvedValue(null),
+    };
+
     usuarioCigamService = {
       findAll: vi.fn().mockResolvedValue([{ ativo: true, ambiente: 'producao' }]),
       findByEnv: vi.fn().mockResolvedValue({
@@ -86,6 +91,7 @@ describe('CigamPedidoService - Idempotência e Retomada', () => {
       cigamHttpClient,
       cigamClienteService,
       cigamTransportadoraService,
+      canalVendaRepository,
       usuarioCigamService,
       deParaFormasPagamentoRepo,
       deParaProdutosRepo,
@@ -276,5 +282,84 @@ describe('CigamPedidoService - Idempotência e Retomada', () => {
     await expect(
       service.enviarPedido(mockPedidoBling, 'UN-01', undefined, null, 'event-uuid-1')
     ).rejects.toThrow('Falha ao adicionar item (Material: MAT-401) no pedido CIGAM #000299: Material sem saldo em estoque.');
+  });
+
+  describe('transportadora padrão do Mercado Livre (Mercado Envios sem transportadora vinculada)', () => {
+    const mockPedidoSemTransportadora = {
+      ...mockPedidoBling,
+      transporte: { contato: { id: 0 }, frete: 0 },
+    };
+
+    beforeEach(() => {
+      cigamHttpClient.post.mockImplementation(async (_base: string, _env: string, path: string) => {
+        if (path === '/API/api/comercial/fa/Pedido/Salvar') {
+          return { success: true, data: { codigoPedido: 'CIGAM-ML-01' } };
+        }
+        if (path === '/API/api/comercial/fa/Pedido/SalvarItemPedido') {
+          return { success: true };
+        }
+        return {};
+      });
+      cigamHttpClient.get.mockResolvedValue([
+        { CodigoMaterial: 'MAT-401' },
+        { CodigoMaterial: 'MAT-402' },
+      ]);
+    });
+
+    it('usa a transportadora CIGAM 374 quando o id_loja bate com o fallback fixo do Mercado Livre', async () => {
+      const pedido = { ...mockPedidoSemTransportadora, loja: { id: 203347320 } };
+
+      await service.enviarPedido(pedido, 'UN-01', undefined, null, 'event-uuid-1');
+
+      expect(canalVendaRepository.findByIdBling).not.toHaveBeenCalled();
+      expect(cigamTransportadoraService.obterOuCriarTransportadora).not.toHaveBeenCalled();
+      expect(cigamHttpClient.post).toHaveBeenCalledWith(
+        'https://erp.cigam.test',
+        'producao',
+        '/API/api/comercial/fa/Pedido/Salvar',
+        expect.objectContaining({ CodigoTransportadora: '374' })
+      );
+    });
+
+    it('usa a transportadora CIGAM 374 quando o canal de venda cadastrado é do tipo Mercado Livre', async () => {
+      canalVendaRepository.findByIdBling.mockResolvedValue({ id_bling: '555', tipo: 'Mercado Livre' });
+      const pedido = { ...mockPedidoSemTransportadora, loja: { id: 555 } };
+
+      await service.enviarPedido(pedido, 'UN-01', undefined, null, 'event-uuid-1');
+
+      expect(canalVendaRepository.findByIdBling).toHaveBeenCalledWith('555');
+      expect(cigamHttpClient.post).toHaveBeenCalledWith(
+        'https://erp.cigam.test',
+        'producao',
+        '/API/api/comercial/fa/Pedido/Salvar',
+        expect.objectContaining({ CodigoTransportadora: '374' })
+      );
+    });
+
+    it('NÃO força a transportadora do Mercado Livre pra canais de venda de outros marketplaces', async () => {
+      canalVendaRepository.findByIdBling.mockResolvedValue({ id_bling: '777', tipo: 'Shopee' });
+      const pedido = { ...mockPedidoSemTransportadora, loja: { id: 777 } };
+
+      await service.enviarPedido(pedido, 'UN-01', undefined, null, 'event-uuid-1');
+
+      expect(cigamHttpClient.post).toHaveBeenCalledWith(
+        'https://erp.cigam.test',
+        'producao',
+        '/API/api/comercial/fa/Pedido/Salvar',
+        expect.objectContaining({ CodigoTransportadora: '' })
+      );
+    });
+
+    it('sem id_loja no pedido: segue enviando sem transportadora (comportamento anterior)', async () => {
+      await service.enviarPedido(mockPedidoSemTransportadora, 'UN-01', undefined, null, 'event-uuid-1');
+
+      expect(canalVendaRepository.findByIdBling).not.toHaveBeenCalled();
+      expect(cigamHttpClient.post).toHaveBeenCalledWith(
+        'https://erp.cigam.test',
+        'producao',
+        '/API/api/comercial/fa/Pedido/Salvar',
+        expect.objectContaining({ CodigoTransportadora: '' })
+      );
+    });
   });
 });

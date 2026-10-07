@@ -4,6 +4,7 @@ import https from 'https';
 import { CigamHttpClient } from './cigamHttpClient';
 import { CigamClienteService } from './cigamClienteService';
 import { CigamTransportadoraService } from './cigamTransportadoraService';
+import { CanalVendaRepository } from '@/modules/canalVenda/repositories/canalVendaRepository';
 import { UsuarioCigamService } from '@/modules/usuarioCigam/services/usuarioCigamService';
 import { DeParaFormasPagamentoRepository } from '@/modules/depara/repositories/deparaFormasPagamentoRepository';
 import { DeParaProdutosRepository } from '@/modules/depara/repositories/deparaProdutosRepository';
@@ -12,12 +13,21 @@ import { EventService } from '@/modules/events/services/eventService';
 import { logger } from '@/shared/utils/logger';
 import { delay } from '@/shared/utils/delay';
 
+// Mesmos fallbacks fixos de id_loja do Bling usados em webhookService.ts pra
+// identificar o Mercado Livre quando o canal ainda não está sincronizado em
+// canal_vendas.
+const MERCADO_LIVRE_ID_LOJA_FALLBACK = '203347320';
+// Transportadora cadastrada no CIGAM pra representar o "Mercado Envios" quando
+// o pedido do Mercado Livre chega sem transportadora vinculada (id 0/ausente).
+const MERCADO_LIVRE_TRANSPORTADORA_CIGAM_ID = '374';
+
 @injectable()
 export class CigamPedidoService {
   constructor(
     @inject(CigamHttpClient) private readonly cigamHttpClient: CigamHttpClient,
     @inject(CigamClienteService) private readonly cigamClienteService: CigamClienteService,
     @inject(CigamTransportadoraService) private readonly cigamTransportadoraService: CigamTransportadoraService,
+    @inject(CanalVendaRepository) private readonly canalVendaRepository: CanalVendaRepository,
     @inject(UsuarioCigamService) private readonly usuarioCigamService: UsuarioCigamService,
     @inject(DeParaFormasPagamentoRepository) private readonly deParaFormasPagamentoRepo: DeParaFormasPagamentoRepository,
     @inject(DeParaProdutosRepository) private readonly deParaProdutosRepo: DeParaProdutosRepository,
@@ -71,10 +81,30 @@ export class CigamPedidoService {
     // 2. Resolução da Transportadora (obter ou criar dinamicamente)
     let idTransportadoraCigam = '';
     const idTranspBling = pedidoBling.transporte?.contato?.id || pedidoBling.transportador?.id;
-    if (idTranspBling && idTranspBling !== 0) {
+    if (idTranspBling && idTranspBling !== 0 && idTranspBling !== '0') {
       idTransportadoraCigam = (await this.cigamTransportadoraService.obterOuCriarTransportadora(String(idTranspBling))).trim();
     } else {
-      logger.info('Pedido sem transportadora válida (ID 0 ou ausente). Enviando ao CIGAM sem transportadora.');
+      // Pedidos do Mercado Livre com "Mercado Envios" chegam do Bling sem
+      // transportadora vinculada (id 0/ausente/""). Nesse caso, em vez de
+      // enviar o pedido ao CIGAM sem transportadora, força a transportadora
+      // padrão cadastrada no CIGAM pro Mercado Livre — mas só quando o canal
+      // de venda do pedido realmente for identificado como Mercado Livre.
+      const idLoja = pedidoBling.loja?.id ? String(pedidoBling.loja.id) : undefined;
+      let ehMercadoLivre = idLoja === MERCADO_LIVRE_ID_LOJA_FALLBACK;
+      if (idLoja && !ehMercadoLivre) {
+        const canalVenda = await this.canalVendaRepository.findByIdBling(idLoja);
+        ehMercadoLivre = (canalVenda?.tipo || '').toLowerCase().includes('mercado');
+      }
+
+      if (ehMercadoLivre) {
+        idTransportadoraCigam = MERCADO_LIVRE_TRANSPORTADORA_CIGAM_ID;
+        logger.info(
+          `Pedido sem transportadora válida, mas canal de venda (loja ${idLoja}) identificado como Mercado Livre. `
+          + `Forçando transportadora padrão do CIGAM: ${idTransportadoraCigam}.`
+        );
+      } else {
+        logger.info('Pedido sem transportadora válida (ID 0 ou ausente). Enviando ao CIGAM sem transportadora.');
+      }
     }
 
     // 3. Resolução da Forma de Pagamento
