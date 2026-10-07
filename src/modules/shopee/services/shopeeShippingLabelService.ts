@@ -3,7 +3,12 @@ import { ShopeeHttpClient } from './shopeeHttpClient';
 import { ShopeeOrderService } from './shopeeOrderService';
 import { logger } from '@/shared/utils/logger';
 
-const SHIPPING_DOCUMENT_TYPE = 'THERMAL_AIR_WAYBILL';
+// NORMAL_AIR_WAYBILL devolve PDF; THERMAL_AIR_WAYBILL devolve documento térmico/TXT,
+// incompatível com o resto do fluxo (merge com o PDF do CIGAM via pdf-lib,
+// Content-Type application/pdf). Usar THERMAL_AIR_WAYBILL aqui foi a causa raiz
+// do erro "No PDF header found" — o download tinha sucesso, mas o conteúdo não
+// era PDF de verdade.
+const SHIPPING_DOCUMENT_TYPE = 'NORMAL_AIR_WAYBILL';
 const TRACKING_POLL_ATTEMPTS = 3;
 const TRACKING_POLL_DELAY_MS = 2000;
 const DOCUMENT_POLL_ATTEMPTS = 3;
@@ -46,6 +51,15 @@ function mapShippingDocumentError(rawMessage: string): string {
   }
   if (/order status|not allow|invalid order/i.test(msg)) {
     return 'O pedido não está em um status que permite gerar etiqueta (confirme se já está pronto para envio).';
+  }
+  if (/shipping_document_should_print_first/i.test(msg)) {
+    return 'A Shopee exige que o documento de envio seja criado/processado antes de imprimir — o fluxo tentou baixar antes do status ficar READY.';
+  }
+  if (/can_not_print_to_label/i.test(msg)) {
+    return 'A conta não está habilitada para gerar etiqueta nesse canal logístico, ou não há pedidos em andamento nesse canal.';
+  }
+  if (/error_server/i.test(msg)) {
+    return 'Falha temporária na Shopee (error_server). Tente novamente em instantes.';
   }
 
   return msg;
