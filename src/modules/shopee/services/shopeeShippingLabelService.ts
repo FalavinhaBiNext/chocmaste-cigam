@@ -9,17 +9,35 @@ import { logger } from '@/shared/utils/logger';
 // do erro "No PDF header found" — o download tinha sucesso, mas o conteúdo não
 // era PDF de verdade.
 const SHIPPING_DOCUMENT_TYPE = 'NORMAL_AIR_WAYBILL';
-const TRACKING_POLL_ATTEMPTS = 3;
-const TRACKING_POLL_DELAY_MS = 2000;
-const DOCUMENT_POLL_ATTEMPTS = 3;
-const DOCUMENT_POLL_DELAY_MS = 2000;
+// Esperas na impressão (~24s cada). Com o envio organizado logo após a NF-e,
+// normalmente o rastreio e o documento já estão prontos na 1ª tentativa.
+const TRACKING_POLL_ATTEMPTS = 8;
+const TRACKING_POLL_DELAY_MS = 3000;
+const DOCUMENT_POLL_ATTEMPTS = 8;
+const DOCUMENT_POLL_DELAY_MS = 3000;
 
 /**
- * batch_ship_order só funciona pro canal logístico 90003 (padrão das lojas BR).
- * Pedidos em outros canais retornam esse tipo de mensagem e precisam do
- * endpoint singular v2.logistics.ship_order como fallback.
+ * Status do pedido na Shopee em que o envio ainda precisa ser organizado
+ * (ship_order). RETRY_SHIP = a Shopee pediu para organizar de novo.
  */
-const BATCH_NAO_SUPORTADO_PATTERN = /can'?t batch ship|batch ship order|do(?:es)? not support batch/i;
+const STATUS_A_ORGANIZAR = new Set(['READY_TO_SHIP', 'RETRY_SHIP']);
+/** Status em que o envio já foi organizado — não chamar ship_order de novo. */
+const STATUS_JA_ORGANIZADO = new Set(['PROCESSED', 'SHIPPED', 'TO_CONFIRM_RECEIVE', 'COMPLETED']);
+
+export interface VerificacaoEnvioItem {
+  orderSn: string;
+  /** Status do pedido na Shopee no momento da verificação. */
+  status?: string;
+  situacao: 'ja_organizado' | 'organizado_agora' | 'falha' | 'ignorado' | 'nao_encontrado';
+  erro?: string;
+}
+
+export interface OrganizarEnvioResult {
+  success: boolean;
+  /** true quando o pedido já estava organizado e nada foi chamado. */
+  jaOrganizado?: boolean;
+  error?: string;
+}
 
 export interface ShippingLabelResult {
   success: boolean;
@@ -73,9 +91,9 @@ export class ShopeeShippingLabelService {
   ) {}
 
   /**
-   * Fallback para pedidos cujo canal logístico não aceita batch_ship_order.
-   * Fluxo: v2.logistics.get_shipping_parameter (descobre se é pickup ou dropoff
-   * e os IDs necessários) → v2.logistics.ship_order (confirma com esses IDs).
+   * Organização do envio recomendada pelo suporte da Shopee:
+   * v2.logistics.get_shipping_parameter (descobre se é pickup ou dropoff e os
+   * IDs necessários) → v2.logistics.ship_order (confirma com esses IDs).
    * Dropoff exige sender_real_name, que a Shopee não devolve — vem da env
    * SHOPEE_SENDER_NAME (nome do remetente cadastrado na loja).
    */
@@ -150,66 +168,141 @@ export class ShopeeShippingLabelService {
     return { success: true };
   }
 
-  /**
-   * Fluxo completo de emissão de etiqueta (confirmado contra a doc oficial da Shopee):
-   * 1. batch_ship_order — confirma o envio do pedido. Lojas do Brasil usam o endpoint
-   *    em lote (canal logístico 90003), não o v2.logistics.ship_order singular.
-   * 2. get_tracking_number — a Shopee só aceita criar o documento depois que o pedido
-   *    tem código de rastreio atribuído; isso pode não ser imediato após o passo 1.
-   * 3. create_shipping_document — dispara a geração do documento (assíncrono).
-   *    shipping_document_type fica DENTRO de cada item de order_list aqui.
-   * 4. get_shipping_document_result — poll até o status ficar READY.
-   * 5. download_shipping_document — baixa o PDF (resposta binária direta). Aqui
-   *    shipping_document_type é campo irmão de order_list, não item por item —
-   *    diferente do passo 3.
-   */
-  async obterEtiqueta(orderSn: string): Promise<ShippingLabelResult> {
-    // Buscado logo no início porque tanto o fallback de ship_order individual
-    // quanto a consulta de tracking number podem depender do package_number
-    // (pedidos com pacote específico) pra resolver corretamente na Shopee.
-    let packageNumber: string | undefined;
+  private async consultarPedido(orderSn: string): Promise<{ status?: string; packageNumber?: string }> {
     try {
       const [pedido] = await this.orderService.buscarDetalhesPedido([orderSn]);
-      packageNumber = (pedido as any)?.package_list?.[0]?.package_number;
-      if (packageNumber) {
-        logger.info(`[SHOPEE LABEL] Pedido ${orderSn} tem package_number=${packageNumber} (canal: ${(pedido as any)?.shipping_carrier ?? 'n/a'})`);
-      }
+      const packageNumber = (pedido as any)?.package_list?.[0]?.package_number;
+      const status = (pedido as any)?.order_status;
+      logger.info(`[SHOPEE LABEL] Pedido ${orderSn}: status=${status ?? 'n/a'}, package_number=${packageNumber ?? 'n/a'}, canal=${(pedido as any)?.shipping_carrier ?? 'n/a'}`);
+      return { status, packageNumber };
     } catch (error: any) {
-      logger.warn(`[SHOPEE LABEL] Falha ao buscar package_number do pedido ${orderSn} (seguindo sem ele): ${error.message}`);
+      logger.warn(`[SHOPEE LABEL] Falha ao consultar o pedido ${orderSn} (seguindo sem status/package_number): ${error.message}`);
+      return {};
+    }
+  }
+
+  /**
+   * Organiza o envio do pedido na Shopee (passo exigido entre o envio da NF-e
+   * e a etiqueta). Chamado logo após o upload da NF-e e, como garantia, na
+   * impressão. Não reorganiza pedido já organizado (PROCESSED, SHIPPED…).
+   * Caminho principal: ship_order (recomendado pela Shopee); plano B:
+   * batch_ship_order.
+   */
+  async organizarEnvio(orderSn: string, pedido?: { status?: string; packageNumber?: string }): Promise<OrganizarEnvioResult> {
+    const { status, packageNumber } = pedido ?? (await this.consultarPedido(orderSn));
+
+    if (status && STATUS_JA_ORGANIZADO.has(status)) {
+      logger.info(`[SHOPEE LABEL] Envio do pedido ${orderSn} já organizado (status ${status}). Nada a fazer.`);
+      return { success: true, jaOrganizado: true };
+    }
+    if (status && !STATUS_A_ORGANIZAR.has(status)) {
+      return {
+        success: false,
+        error: `O pedido está com status ${status} na Shopee, que não permite organizar o envio (é preciso estar READY_TO_SHIP).`,
+      };
     }
 
-    // Guarda o motivo específico de falha do batch_ship_order (fail_error/fail_message
-    // do item, não a mensagem genérica de topo tipo "All failed, please check
-    // result_list for detail") — usado depois pra explicar por que o tracking
-    // number nunca chegou, em vez de só dizer "tente novamente em instantes".
-    let motivoFalhaShipOrder: string | undefined;
+    const individual = await this.confirmarEnvioIndividual(orderSn, packageNumber);
+    if (individual.success) {
+      return { success: true };
+    }
+    logger.warn(`[SHOPEE LABEL] ship_order falhou para ${orderSn}: ${individual.error}. Tentando batch_ship_order...`);
 
     try {
       const shipResponse = await this.httpClient.post<any>('/logistics/batch_ship_order', {
         order_list: [{ order_sn: orderSn }],
       });
       const shipItem = getResultItem(shipResponse, orderSn);
-      if (shipResponse.error || shipItem?.fail_error) {
-        motivoFalhaShipOrder = shipItem?.fail_message || shipItem?.fail_error || shipResponse.message || shipResponse.error;
-        logger.warn(
-          `[SHOPEE LABEL] batch_ship_order retornou aviso para ${orderSn} — item: ${shipItem?.fail_error ?? 'n/a'} / ${shipItem?.fail_message ?? 'n/a'} | topo: ${shipResponse.message ?? shipResponse.error ?? 'n/a'}`
+      if (!shipResponse.error && !shipItem?.fail_error) {
+        logger.success(`[SHOPEE LABEL] batch_ship_order confirmado para ${orderSn} (plano B).`);
+        return { success: true };
+      }
+      const motivoBatch = shipItem?.fail_message || shipItem?.fail_error || shipResponse.message || shipResponse.error;
+      return { success: false, error: `ship_order: ${individual.error} | batch_ship_order: ${motivoBatch}` };
+    } catch (error: any) {
+      return { success: false, error: `ship_order: ${individual.error} | batch_ship_order: ${error.message}` };
+    }
+  }
+
+  /**
+   * Verifica e organiza em lote o envio de vários pedidos. Consulta o status de
+   * até 50 pedidos por chamada (get_order_detail) e só chama ship_order para os
+   * que ainda estão READY_TO_SHIP/RETRY_SHIP — um de cada vez, para não estourar
+   * o limite de requisições da Shopee.
+   */
+  async verificarEOrganizarEnvios(orderSns: string[]): Promise<VerificacaoEnvioItem[]> {
+    const unicos = [...new Set(orderSns.filter(Boolean))];
+    const resultados: VerificacaoEnvioItem[] = [];
+
+    for (let i = 0; i < unicos.length; i += 50) {
+      const lote = unicos.slice(i, i + 50);
+      let detalhes: any[] = [];
+      try {
+        detalhes = await this.orderService.buscarDetalhesPedido(lote);
+      } catch (error: any) {
+        for (const orderSn of lote) {
+          resultados.push({ orderSn, situacao: 'falha', erro: `Falha ao consultar o pedido na Shopee: ${error.message}` });
+        }
+        continue;
+      }
+
+      const porOrderSn = new Map(detalhes.map((d: any) => [String(d.order_sn), d]));
+      for (const orderSn of lote) {
+        const pedido = porOrderSn.get(orderSn);
+        if (!pedido) {
+          resultados.push({ orderSn, situacao: 'nao_encontrado' });
+          continue;
+        }
+
+        const status: string | undefined = pedido.order_status;
+        if (status && STATUS_JA_ORGANIZADO.has(status)) {
+          resultados.push({ orderSn, status, situacao: 'ja_organizado' });
+          continue;
+        }
+        if (!status || !STATUS_A_ORGANIZAR.has(status)) {
+          resultados.push({ orderSn, status, situacao: 'ignorado' });
+          continue;
+        }
+
+        const organizacao = await this.organizarEnvio(orderSn, {
+          status,
+          packageNumber: pedido.package_list?.[0]?.package_number,
+        });
+        resultados.push(
+          organizacao.success
+            ? { orderSn, status, situacao: 'organizado_agora' }
+            : { orderSn, status, situacao: 'falha', erro: organizacao.error },
         );
       }
-    } catch (error: any) {
-      // Pedido já confirmado anteriormente também pode cair aqui — não bloqueia o fluxo.
-      motivoFalhaShipOrder = error.message;
-      logger.warn(`[SHOPEE LABEL] batch_ship_order falhou para ${orderSn} (seguindo mesmo assim): ${error.message}`);
     }
 
-    if (motivoFalhaShipOrder && BATCH_NAO_SUPORTADO_PATTERN.test(motivoFalhaShipOrder)) {
-      logger.info(`[SHOPEE LABEL] Canal logístico de ${orderSn} não aceita batch_ship_order — tentando ship_order individual...`);
-      const fallback = await this.confirmarEnvioIndividual(orderSn, packageNumber);
-      if (fallback.success) {
-        motivoFalhaShipOrder = undefined;
-      } else {
-        logger.warn(`[SHOPEE LABEL] Fallback ship_order individual também falhou para ${orderSn}: ${fallback.error}`);
-        motivoFalhaShipOrder = `${motivoFalhaShipOrder} | Fallback ship_order individual também falhou: ${fallback.error}`;
-      }
+    return resultados;
+  }
+
+  /**
+   * Fluxo completo de emissão de etiqueta (recomendado pelo suporte da Shopee):
+   * 1. upload_invoice_doc (NF-e) — feito antes, em ShopeeFiscalService.
+   * 2. ship_order — organiza o envio. Normalmente já foi feito logo após a NF-e;
+   *    aqui só é refeito se o pedido ainda estiver READY_TO_SHIP.
+   * 3. get_tracking_number — o documento só pode ser criado com rastreio.
+   * 4. create_shipping_document — dispara a geração do documento (assíncrono).
+   *    shipping_document_type fica DENTRO de cada item de order_list aqui.
+   * 5. get_shipping_document_result — poll até o status ficar READY.
+   * 6. download_shipping_document — baixa o PDF (resposta binária direta). Aqui
+   *    shipping_document_type é campo irmão de order_list, não item por item —
+   *    diferente do passo 4.
+   */
+  async obterEtiqueta(orderSn: string): Promise<ShippingLabelResult> {
+    const pedido = await this.consultarPedido(orderSn);
+    const { packageNumber } = pedido;
+
+    // Guarda o motivo da falha ao organizar o envio — usado depois pra explicar
+    // por que o rastreio nunca chegou, em vez de só dizer "tente novamente".
+    let motivoFalhaShipOrder: string | undefined;
+    const organizacao = await this.organizarEnvio(orderSn, pedido);
+    if (!organizacao.success) {
+      motivoFalhaShipOrder = organizacao.error;
+      logger.warn(`[SHOPEE LABEL] Não foi possível organizar o envio de ${orderSn} (seguindo mesmo assim): ${organizacao.error}`);
     }
 
     let trackingNumber: string | undefined;
@@ -235,7 +328,7 @@ export class ShopeeShippingLabelService {
       return {
         success: false,
         errorCode: 'NOT_PRINTABLE',
-        error: `A Shopee ainda não atribuiu um código de rastreio a este pedido. Isso pode levar alguns minutos após a confirmação de envio — tente novamente em instantes.${sufixoMotivo}`,
+        error: `A Shopee ainda não atribuiu um código de rastreio a este pedido. Isso pode levar alguns minutos após a organização do envio (até cerca de 2 horas, segundo a Shopee) — tente novamente mais tarde.${sufixoMotivo}`,
       };
     }
 
@@ -294,7 +387,7 @@ export class ShopeeShippingLabelService {
       return {
         success: false,
         errorCode: 'NOT_PRINTABLE',
-        error: 'A etiqueta ainda está sendo processada pela Shopee. Tente novamente em alguns segundos.',
+        error: 'A etiqueta ainda está sendo processada pela Shopee. Tente novamente em alguns minutos.',
       };
     }
 

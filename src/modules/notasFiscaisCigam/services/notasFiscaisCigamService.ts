@@ -490,7 +490,67 @@ export class NotasFiscaisCigamService {
     }
 
     logger.success(`[NF-E CIGAM] NF-e ${nota.id} enviada manualmente com sucesso ao marketplace ${nota.marketplace}.`);
+
+    // Shopee: logo após a NF-e, o envio precisa ser organizado (ship_order) para
+    // o pedido avançar e a etiqueta ser liberada. Uma falha aqui não desfaz o
+    // envio da NF-e — a impressão da etiqueta tenta organizar de novo.
+    if (nota.marketplace === 'shopee' && nota.numero_pedido_marketplace) {
+      try {
+        const organizacao = await this.shopeeShippingLabelService.organizarEnvio(nota.numero_pedido_marketplace);
+        if (organizacao.success) {
+          logger.success(`[NF-E CIGAM] Envio do pedido Shopee ${nota.numero_pedido_marketplace} organizado após a NF-e.`);
+          return {
+            success: true,
+            message: 'NF-e enviada e envio organizado na Shopee. A etiqueta pode levar alguns minutos para ficar disponível.',
+          };
+        }
+        logger.warn(`[NF-E CIGAM] NF-e enviada, mas a organização do envio na Shopee falhou: ${organizacao.error}`);
+        return {
+          success: true,
+          message: `NF-e enviada à Shopee, mas não foi possível organizar o envio agora (${organizacao.error}). Isso será tentado de novo ao imprimir a etiqueta.`,
+        };
+      } catch (error: any) {
+        logger.warn(`[NF-E CIGAM] NF-e enviada, mas houve erro ao organizar o envio na Shopee: ${error.message}`);
+      }
+    }
+
     return { success: true, message: 'NF-e enviada com sucesso ao marketplace.' };
+  }
+
+  /**
+   * Fallback para NF-es Shopee já enviadas: verifica, na Shopee, se o envio de
+   * cada pedido foi organizado (ship_order) e organiza os que ainda estão
+   * READY_TO_SHIP. Cobre as NF-es enviadas antes de a organização passar a ser
+   * feita logo após o upload, e os casos em que ela falhou naquele momento.
+   */
+  async verificarOrganizacaoEnvioShopee(dias = 30) {
+    const desde = new Date(Date.now() - dias * 24 * 60 * 60 * 1000);
+    const notas = await this.notasFiscaisCigamRepository.findShopeeEnviadasDesde(desde);
+    logger.info(`[NF-E CIGAM] Verificando organização do envio de ${notas.length} NF-e(s) Shopee enviada(s) nos últimos ${dias} dias...`);
+
+    const resultados = await this.shopeeShippingLabelService.verificarEOrganizarEnvios(
+      notas.map((n) => n.numero_pedido_marketplace),
+    );
+    const notaPorPedido = new Map(notas.map((n) => [n.numero_pedido_marketplace, n]));
+
+    const itens = resultados.map((r) => ({
+      ...r,
+      notaId: notaPorPedido.get(r.orderSn)?.id ?? null,
+      numeroPedidoCigam: notaPorPedido.get(r.orderSn)?.numero_pedido_cigam ?? null,
+    }));
+    const contar = (situacao: string) => itens.filter((i) => i.situacao === situacao).length;
+
+    const resumo = {
+      verificados: itens.length,
+      jaOrganizados: contar('ja_organizado'),
+      organizadosAgora: contar('organizado_agora'),
+      falhas: contar('falha'),
+      ignorados: contar('ignorado'),
+      naoEncontrados: contar('nao_encontrado'),
+    };
+    logger.success(`[NF-E CIGAM] Verificação de envios Shopee concluída: ${JSON.stringify(resumo)}`);
+
+    return { resumo, itens };
   }
 
   /**

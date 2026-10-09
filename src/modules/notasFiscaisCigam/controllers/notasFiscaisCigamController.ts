@@ -185,6 +185,22 @@ export class NotasFiscaisCigamController {
     });
   }
 
+  /**
+   * Verifica e organiza o envio (ship_order) das NF-es Shopee já enviadas.
+   * POST /notas-fiscais-cigam/shopee/verificar-envios?dias=30
+   */
+  verificarEnviosShopee = async (req: Request, res: Response): Promise<void> => {
+    const dias = Math.min(Math.max(Number(req.query.dias) || 30, 1), 90);
+
+    const resultado = await this.notasFiscaisCigamService.verificarOrganizacaoEnvioShopee(dias);
+
+    res.status(200).json({
+      success: true,
+      message: `${resultado.resumo.verificados} pedido(s) Shopee verificado(s): ${resultado.resumo.organizadosAgora} organizado(s) agora, ${resultado.resumo.falhas} com falha.`,
+      data: resultado,
+    });
+  }
+
   enviarParaMarketplacePorPedido = async (req: Request, res: Response): Promise<void> => {
     const numeroPedidoCigam = String(req.params.numeroPedidoCigam);
 

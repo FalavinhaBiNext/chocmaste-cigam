@@ -1,4 +1,5 @@
 import { injectable } from 'tsyringe';
+import { Op } from 'sequelize';
 import { NotasFiscaisCigamModel } from '../models/notasFiscaisCigamModel';
 import { CreateNotaFiscalCigamDTO, ResponseNotaFiscalCigamDTO } from '../dto';
 import { parseDateOnly } from '@/shared/utils/date';
@@ -58,6 +59,28 @@ export class NotasFiscaisCigamRepository {
       order: [['created_at', 'DESC']],
     });
     return notas.map(n => this.toDTO(n));
+  }
+
+  /**
+   * NF-es da Shopee já enviadas desde a data informada — só os campos para
+   * identificar o pedido (sem o XML), para a verificação da organização do envio.
+   */
+  async findShopeeEnviadasDesde(desde: Date): Promise<Array<{ id: string; numero_pedido_cigam: string; numero_pedido_marketplace: string }>> {
+    const notas = await NotasFiscaisCigamModel.findAll({
+      attributes: ['id', 'numero_pedido_cigam', 'numero_pedido_marketplace'],
+      where: {
+        marketplace: 'shopee',
+        enviado_marketplace: true,
+        numero_pedido_marketplace: { [Op.ne]: null },
+        created_at: { [Op.gte]: desde },
+      },
+      order: [['created_at', 'DESC']],
+    });
+    return notas.map((n) => ({
+      id: n.id,
+      numero_pedido_cigam: n.numero_pedido_cigam,
+      numero_pedido_marketplace: String(n.numero_pedido_marketplace),
+    }));
   }
 
   async updateEnviadoMarketplace(id: string, enviado: boolean): Promise<void> {
