@@ -41,7 +41,8 @@ export const listEventsQuerySchema = z.object({
 
 export type ListEventsQuery = z.infer<typeof listEventsQuerySchema>;
 
-export const MAX_EVENTOS_EXCLUSAO_LOTE = 500;
+// Mesmo limite de seleção da tela de Eventos (MAX_SELECAO_EXCLUSAO_LOTE no frontend).
+export const MAX_EVENTOS_EXCLUSAO_LOTE = 50;
 
 export const deletePendingBatchSchema = z.object({
   ids: z
