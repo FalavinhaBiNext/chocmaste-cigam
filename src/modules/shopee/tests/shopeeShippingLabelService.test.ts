@@ -8,7 +8,7 @@ import { ShopeeShippingLabelService } from '../services/shopeeShippingLabelServi
 
 const PARAM_DROPOFF = {
   response: {
-    info_needed: { dropoff: true },
+    info_needed: { dropoff: ['branch_id', 'sender_real_name'] },
     dropoff: { branch_list: [{ branch_id: 999, branch_name: 'Ponto Teste' }] },
   },
 };
@@ -47,6 +47,60 @@ describe('ShopeeShippingLabelService.organizarEnvio', () => {
       dropoff: { branch_id: 999, sender_real_name: 'Loja Teste' },
     });
     expect(mockHttpClient.post).not.toHaveBeenCalledWith('/logistics/batch_ship_order', expect.anything());
+  });
+
+  it('dropoff sem campos exigidos (Shopee Xpress): envia dropoff vazio, sem exigir ponto nem SHOPEE_SENDER_NAME', async () => {
+    // Resposta real do get_shipping_parameter para Shopee Xpress.
+    mockHttpClient.get.mockResolvedValue({
+      error: '',
+      message: '',
+      response: { info_needed: { dropoff: [] }, dropoff: { branch_list: null } },
+    });
+    mockOrderService.buscarDetalhesPedido.mockResolvedValue([{
+      order_status: 'READY_TO_SHIP',
+      package_list: [{ package_number: 'OFG245193611137357' }],
+    }]);
+    mockHttpClient.post.mockResolvedValue({ error: '', message: '', response: {} });
+
+    const resultado = await service.organizarEnvio('2610095MA03CB6');
+
+    expect(resultado).toEqual({ success: true });
+    expect(mockHttpClient.post).toHaveBeenCalledWith('/logistics/ship_order', {
+      order_sn: '2610095MA03CB6',
+      package_number: 'OFG245193611137357',
+      dropoff: {},
+    });
+    expect(mockHttpClient.post).not.toHaveBeenCalledWith('/logistics/batch_ship_order', expect.anything());
+  });
+
+  it('coleta (pickup): preenche endereço e horário pedidos pela Shopee', async () => {
+    mockHttpClient.get.mockResolvedValue({
+      response: {
+        info_needed: { pickup: ['address_id', 'pickup_time_id'] },
+        pickup: { address_list: [{ address_id: 11, time_slot_list: [{ pickup_time_id: 'T1' }] }] },
+      },
+    });
+    mockHttpClient.post.mockResolvedValue({ response: {} });
+
+    await service.organizarEnvio('ORDER1');
+
+    expect(mockHttpClient.post).toHaveBeenCalledWith('/logistics/ship_order', {
+      order_sn: 'ORDER1',
+      pickup: { address_id: 11, pickup_time_id: 'T1' },
+    });
+  });
+
+  it('recusa com mensagem clara quando a Shopee pede campo que o sistema não preenche', async () => {
+    mockHttpClient.get.mockResolvedValue({
+      response: { info_needed: { dropoff: ['tracking_number'] } },
+    });
+    mockHttpClient.post.mockResolvedValue({ error: 'logistics_error', message: 'Canal não suporta lote.' });
+
+    const resultado = await service.organizarEnvio('ORDER1');
+
+    expect(resultado.success).toBe(false);
+    expect(resultado.error).toContain('tracking_number');
+    expect(mockHttpClient.post).not.toHaveBeenCalledWith('/logistics/ship_order', expect.anything());
   });
 
   it('não reorganiza pedido já organizado (PROCESSED)', async () => {

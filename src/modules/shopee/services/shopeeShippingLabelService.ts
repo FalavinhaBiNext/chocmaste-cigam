@@ -92,10 +92,13 @@ export class ShopeeShippingLabelService {
 
   /**
    * Organização do envio recomendada pelo suporte da Shopee:
-   * v2.logistics.get_shipping_parameter (descobre se é pickup ou dropoff e os
-   * IDs necessários) → v2.logistics.ship_order (confirma com esses IDs).
-   * Dropoff exige sender_real_name, que a Shopee não devolve — vem da env
-   * SHOPEE_SENDER_NAME (nome do remetente cadastrado na loja).
+   * v2.logistics.get_shipping_parameter → v2.logistics.ship_order.
+   *
+   * Em info_needed, a Shopee informa o modo (pickup / dropoff / non_integrated)
+   * e a LISTA de campos que o ship_order exige nesse modo. Lista vazia
+   * (ex.: {"dropoff": []}, comum no Shopee Xpress) = nenhum dado extra: envia
+   * o modo com objeto vazio (dropoff: {}). Só os campos listados são
+   * preenchidos — sender_real_name vem da env SHOPEE_SENDER_NAME.
    */
   private async confirmarEnvioIndividual(orderSn: string, packageNumber?: string): Promise<{ success: boolean; error?: string }> {
     let paramResponse: any;
@@ -121,33 +124,67 @@ export class ShopeeShippingLabelService {
 
     const info = paramResponse.response?.info_needed || {};
     const body: Record<string, any> = { order_sn: orderSn };
+    if (packageNumber) {
+      body.package_number = packageNumber;
+    }
 
-    if (info.pickup) {
+    // Campos que a Shopee exige no modo escolhido. Aceita o formato antigo
+    // (true) como "sem lista" por compatibilidade.
+    const camposDe = (valor: unknown): string[] => (Array.isArray(valor) ? valor.map(String) : []);
+    const naoSuportados = (campos: string[], suportados: string[]) => campos.filter((c) => !suportados.includes(c));
+
+    if (info.pickup !== undefined && info.pickup !== null) {
+      const campos = camposDe(info.pickup);
+      const faltando = naoSuportados(campos, ['address_id', 'pickup_time_id']);
+      if (faltando.length > 0) {
+        return { success: false, error: `A Shopee pede campos de coleta que o sistema não preenche automaticamente (${faltando.join(', ')}). Organize este envio pelo painel da Shopee. Resposta bruta: ${rawPreview}` };
+      }
+
+      const pickup: Record<string, unknown> = {};
       const address = paramResponse.response?.pickup?.address_list?.[0];
-      const pickupTimeId = address?.time_slot_list?.[0]?.pickup_time_id;
-      if (!address || !pickupTimeId) {
-        return {
-          success: false,
-          error: `A Shopee exige coleta (pickup) para este pedido, mas não retornou endereço/horário disponível. Resposta bruta: ${rawPreview}`,
-        };
+      if (campos.includes('address_id')) {
+        if (!address) {
+          return { success: false, error: `A Shopee exige coleta (pickup) para este pedido, mas não retornou endereço disponível. Resposta bruta: ${rawPreview}` };
+        }
+        pickup.address_id = address.address_id;
       }
-      body.pickup = { address_id: address.address_id, pickup_time_id: pickupTimeId };
-    } else if (info.dropoff) {
-      const branch = paramResponse.response?.dropoff?.branch_list?.[0];
-      if (!branch) {
-        return {
-          success: false,
-          error: `A Shopee exige postagem (dropoff) para este pedido, mas não retornou nenhum ponto de entrega disponível. Resposta bruta: ${rawPreview}`,
-        };
+      if (campos.includes('pickup_time_id')) {
+        const pickupTimeId = address?.time_slot_list?.[0]?.pickup_time_id;
+        if (!pickupTimeId) {
+          return { success: false, error: `A Shopee exige coleta (pickup) para este pedido, mas não retornou horário de coleta disponível. Resposta bruta: ${rawPreview}` };
+        }
+        pickup.pickup_time_id = pickupTimeId;
       }
-      const senderName = process.env.SHOPEE_SENDER_NAME;
-      if (!senderName) {
-        return {
-          success: false,
-          error: 'SHOPEE_SENDER_NAME não configurado no servidor (necessário para confirmar postagem/dropoff deste pedido).',
-        };
+      body.pickup = pickup;
+    } else if (info.dropoff !== undefined && info.dropoff !== null) {
+      const campos = camposDe(info.dropoff);
+      const faltando = naoSuportados(campos, ['branch_id', 'sender_real_name']);
+      if (faltando.length > 0) {
+        return { success: false, error: `A Shopee pede campos de postagem que o sistema não preenche automaticamente (${faltando.join(', ')}). Organize este envio pelo painel da Shopee. Resposta bruta: ${rawPreview}` };
       }
-      body.dropoff = { branch_id: branch.branch_id, sender_real_name: senderName };
+
+      const dropoff: Record<string, unknown> = {};
+      if (campos.includes('branch_id')) {
+        const branch = paramResponse.response?.dropoff?.branch_list?.[0];
+        if (!branch) {
+          return { success: false, error: `A Shopee exige postagem (dropoff) em um ponto de entrega, mas não retornou nenhum disponível. Resposta bruta: ${rawPreview}` };
+        }
+        dropoff.branch_id = branch.branch_id;
+      }
+      if (campos.includes('sender_real_name')) {
+        const senderName = process.env.SHOPEE_SENDER_NAME;
+        if (!senderName) {
+          return { success: false, error: 'SHOPEE_SENDER_NAME não configurado no servidor (a Shopee exige o nome do remetente para a postagem deste pedido).' };
+        }
+        dropoff.sender_real_name = senderName;
+      }
+      body.dropoff = dropoff;
+    } else if (info.non_integrated !== undefined && info.non_integrated !== null) {
+      const campos = camposDe(info.non_integrated);
+      if (campos.length > 0) {
+        return { success: false, error: `Canal logístico não integrado: a Shopee exige dados do envio informados pelo vendedor (${campos.join(', ')}). Organize este envio pelo painel da Shopee. Resposta bruta: ${rawPreview}` };
+      }
+      body.non_integrated = {};
     } else {
       return {
         success: false,
@@ -155,8 +192,11 @@ export class ShopeeShippingLabelService {
       };
     }
 
+    logger.info(`[SHOPEE LABEL] Chamando ship_order para ${orderSn}: ${JSON.stringify(body)}`);
+
     try {
       const shipResponse = await this.httpClient.post<any>('/logistics/ship_order', body);
+      logger.info(`[SHOPEE LABEL] Retorno do ship_order de ${orderSn}: ${JSON.stringify(shipResponse)}`);
       if (shipResponse.error) {
         return { success: false, error: shipResponse.message || shipResponse.error };
       }
