@@ -1,6 +1,6 @@
 import { inject, injectable } from 'tsyringe';
 import { Request, Response } from "express";
-import { validateWebhookEvent, validateListEventsQuery } from "../events.validator";
+import { validateWebhookEvent, validateListEventsQuery, validateDeletePendingBatch } from "../events.validator";
 import { EventService } from "../services/eventService";
 import { WebhookService } from "../../bling/services/webhookService";
 import { BlingHttpClient } from "../../bling/services/blingHttpClient";
@@ -194,6 +194,17 @@ export class EventController {
         res.status(200).json({
             success: true,
             message: 'Evento excluído com sucesso.'
+        })
+    }
+
+    deletePendingBatch = async (req: Request, res: Response) => {
+        const { ids } = validateDeletePendingBatch(req.body)
+        const result = await this.eventService.deletePendingBatch(ids)
+
+        res.status(200).json({
+            success: true,
+            message: `${result.deleted} evento(s) pendente(s) excluído(s) com sucesso.`,
+            data: result
         })
     }
 }

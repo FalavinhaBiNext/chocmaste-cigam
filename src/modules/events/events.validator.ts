@@ -41,6 +41,17 @@ export const listEventsQuerySchema = z.object({
 
 export type ListEventsQuery = z.infer<typeof listEventsQuerySchema>;
 
+export const MAX_EVENTOS_EXCLUSAO_LOTE = 500;
+
+export const deletePendingBatchSchema = z.object({
+  ids: z
+    .array(z.string().uuid('Cada id deve ser um UUID válido.'))
+    .min(1, 'Informe ao menos um evento para excluir.')
+    .max(MAX_EVENTOS_EXCLUSAO_LOTE, `É possível excluir no máximo ${MAX_EVENTOS_EXCLUSAO_LOTE} eventos por vez.`),
+});
+
+export type DeletePendingBatchInput = z.infer<typeof deletePendingBatchSchema>;
+
 export function validateCreateEvent(input: unknown) {
   const result = createEventSchema.safeParse(input);
 
@@ -66,6 +77,16 @@ export function validateListEventsQuery(input: unknown) {
 
   if (!result.success) {
     throw new ValidationError('Parâmetros de consulta inválidos.', result.error.flatten());
+  }
+
+  return result.data;
+}
+
+export function validateDeletePendingBatch(input: unknown) {
+  const result = deletePendingBatchSchema.safeParse(input);
+
+  if (!result.success) {
+    throw new ValidationError('Dados inválidos.', result.error.flatten());
   }
 
   return result.data;

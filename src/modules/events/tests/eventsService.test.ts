@@ -103,4 +103,40 @@ describe('EventService', () => {
       cigam_pedido_id: 'CIGAM-999',
     });
   });
+
+  describe('deletePendingBatch', () => {
+    beforeEach(() => {
+      repo.findByIds = vi.fn();
+      repo.deletePendingByIds = vi.fn();
+    });
+
+    it('exclui os pendentes e ignora sincronizados e inexistentes', async () => {
+      repo.findByIds.mockResolvedValue([
+        { id: 'a', cigam_sincronizado: false },
+        { id: 'b', cigam_sincronizado: true },
+      ]);
+      repo.deletePendingByIds.mockResolvedValue(1);
+
+      const result = await svc.deletePendingBatch(['a', 'b', 'c', 'a']);
+
+      expect(repo.findByIds).toHaveBeenCalledWith(['a', 'b', 'c']);
+      expect(repo.deletePendingByIds).toHaveBeenCalledWith(['a']);
+      expect(result).toEqual({
+        deleted: 1,
+        skipped: [
+          { id: 'b', reason: 'ja_sincronizado' },
+          { id: 'c', reason: 'nao_encontrado' },
+        ],
+      });
+    });
+
+    it('não chama o delete quando nenhum evento é pendente', async () => {
+      repo.findByIds.mockResolvedValue([{ id: 'b', cigam_sincronizado: true }]);
+
+      const result = await svc.deletePendingBatch(['b']);
+
+      expect(repo.deletePendingByIds).not.toHaveBeenCalled();
+      expect(result.deleted).toBe(0);
+    });
+  });
 });

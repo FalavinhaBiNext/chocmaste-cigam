@@ -1,4 +1,5 @@
 import { injectable } from 'tsyringe';
+import { Op } from 'sequelize';
 import { EventModel } from "../models/eventModel";
 import { IEventRepository } from "../interfaces/IEventRepository";
 import { ResponseEventDTO } from "../dto";
@@ -104,5 +105,22 @@ export class EventRepository implements IEventRepository {
 
     async delete(id: string): Promise<void> {
         await EventModel.destroy({ where: { id } });
+    }
+
+    async findByIds(ids: string[]): Promise<ResponseEventDTO[]> {
+        const events = await EventModel.findAll({ where: { id: { [Op.in]: ids } } });
+        return events.map(EventMapper.eventToDTO);
+    }
+
+    /**
+     * Exclui, numa única operação, apenas os eventos ainda não sincronizados
+     * com o CIGAM. A condição cigam_sincronizado=false fica no próprio DELETE
+     * para que um evento sincronizado entre a consulta e a exclusão não seja
+     * apagado. Retorna a quantidade de registros removidos.
+     */
+    async deletePendingByIds(ids: string[]): Promise<number> {
+        return EventModel.destroy({
+            where: { id: { [Op.in]: ids }, cigam_sincronizado: false },
+        });
     }
 }

@@ -7,6 +7,12 @@ import { NotFoundError } from "@/shared/errors/AppError";
 import { EventRepository } from "../repositories/eventRepository";
 import { randomUUID } from 'crypto';
 
+export interface DeletePendingBatchResult {
+    deleted: number;
+    /** IDs recebidos que não foram excluídos: inexistentes ou já sincronizados com o CIGAM. */
+    skipped: Array<{ id: string; reason: 'nao_encontrado' | 'ja_sincronizado' }>;
+}
+
 @injectable()
 export class EventService {
     constructor(
@@ -130,5 +136,38 @@ export class EventService {
         }
         await this.eventRepository.delete(id)
         logger.success(`Event ${id} deleted successfully`)
+    }
+
+    /**
+     * Exclui em lote os eventos pendentes (ainda não sincronizados com o
+     * CIGAM). Eventos já sincronizados ou inexistentes são ignorados e
+     * devolvidos em `skipped`, em vez de abortar o lote inteiro.
+     */
+    async deletePendingBatch(ids: string[]): Promise<DeletePendingBatchResult>{
+        const idsUnicos = [...new Set(ids)]
+        logger.info(`Exclusão em lote solicitada para ${idsUnicos.length} evento(s) pendente(s)`)
+
+        const encontrados = await this.eventRepository.findByIds(idsUnicos)
+        const porId = new Map(encontrados.map((event) => [event.id, event]))
+
+        const skipped: DeletePendingBatchResult['skipped'] = []
+        const idsPendentes: string[] = []
+        for (const id of idsUnicos) {
+            const event = porId.get(id)
+            if (!event) {
+                skipped.push({ id, reason: 'nao_encontrado' })
+            } else if (event.cigam_sincronizado) {
+                skipped.push({ id, reason: 'ja_sincronizado' })
+            } else {
+                idsPendentes.push(id)
+            }
+        }
+
+        const deleted = idsPendentes.length > 0
+            ? await this.eventRepository.deletePendingByIds(idsPendentes)
+            : 0
+
+        logger.success(`Exclusão em lote concluída: ${deleted} evento(s) excluído(s), ${skipped.length} ignorado(s)`)
+        return { deleted, skipped }
     }
 }

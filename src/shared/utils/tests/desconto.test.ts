@@ -8,9 +8,10 @@ describe('calcularPercentualDesconto', () => {
     expect(calcularPercentualDesconto(25, 200)).toBe(12.5);
   });
 
-  it('deve arredondar o percentual para 2 casas decimais', () => {
-    expect(calcularPercentualDesconto(57, 2084.9)).toBe(2.73);
-    expect(calcularPercentualDesconto(10, 30)).toBe(33.33);
+  it('deve arredondar o percentual para 5 casas decimais', () => {
+    expect(calcularPercentualDesconto(57, 2084.9)).toBe(2.73394);
+    expect(calcularPercentualDesconto(10, 30)).toBe(33.33333);
+    expect(calcularPercentualDesconto(20, 30)).toBe(66.66667);
   });
 
   it('deve retornar 0 quando não há desconto', () => {

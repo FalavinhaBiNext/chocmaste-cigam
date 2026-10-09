@@ -94,4 +94,22 @@ describe('EventRepository', () => {
     expect(total).toBeGreaterThanOrEqual(2);
     expect(counts.falha).toBeGreaterThanOrEqual(1);
   });
+
+  it('deletePendingByIds exclui só os eventos não sincronizados', async () => {
+    const pendente = await repo.create(createEventInput({
+      id: '7a1b2c3d-0000-4000-8000-000000000001', pedido_id: 70001, numero_pedido: 7001,
+    }) as any);
+    const sincronizado = await repo.create(createEventInput({
+      id: '7a1b2c3d-0000-4000-8000-000000000002', pedido_id: 70002, numero_pedido: 7002,
+    }) as any);
+    await repo.update(sincronizado.id, { cigam_sincronizado: true, cigam_pedido_id: 'CIGAM-1' });
+
+    const encontrados = await repo.findByIds([pendente.id, sincronizado.id]);
+    expect(encontrados.map(e => e.id).sort()).toEqual([pendente.id, sincronizado.id].sort());
+
+    const removidos = await repo.deletePendingByIds([pendente.id, sincronizado.id]);
+    expect(removidos).toBe(1);
+    expect(await repo.findById(pendente.id)).toBeNull();
+    expect(await repo.findById(sincronizado.id)).not.toBeNull();
+  });
 });
