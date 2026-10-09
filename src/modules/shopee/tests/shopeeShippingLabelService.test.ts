@@ -65,12 +65,33 @@ describe('ShopeeShippingLabelService.organizarEnvio', () => {
     const resultado = await service.organizarEnvio('2610095MA03CB6');
 
     expect(resultado).toEqual({ success: true });
+    // Pedido não dividido: sem package_number (a Shopee recusa o campo).
     expect(mockHttpClient.post).toHaveBeenCalledWith('/logistics/ship_order', {
       order_sn: '2610095MA03CB6',
-      package_number: 'OFG245193611137357',
       dropoff: {},
     });
-    expect(mockHttpClient.post).not.toHaveBeenCalledWith('/logistics/batch_ship_order', expect.anything());
+    expect(mockHttpClient.post).toHaveBeenCalledTimes(1);
+  });
+
+  it('pedido dividido: repete o ship_order com package_number quando a Shopee pede', async () => {
+    mockHttpClient.get.mockResolvedValue({ response: { info_needed: { dropoff: [] } } });
+    mockOrderService.buscarDetalhesPedido.mockResolvedValue([{
+      order_status: 'READY_TO_SHIP',
+      package_list: [{ package_number: 'PKG-SPLIT-1' }],
+    }]);
+    mockHttpClient.post
+      .mockResolvedValueOnce({ error: 'logistics.package_number_required', message: 'package_number is required for split order' })
+      .mockResolvedValueOnce({ response: {} });
+
+    const resultado = await service.organizarEnvio('ORDER1');
+
+    expect(resultado).toEqual({ success: true });
+    expect(mockHttpClient.post).toHaveBeenNthCalledWith(1, '/logistics/ship_order', { order_sn: 'ORDER1', dropoff: {} });
+    expect(mockHttpClient.post).toHaveBeenNthCalledWith(2, '/logistics/ship_order', {
+      order_sn: 'ORDER1',
+      dropoff: {},
+      package_number: 'PKG-SPLIT-1',
+    });
   });
 
   it('coleta (pickup): preenche endereço e horário pedidos pela Shopee', async () => {

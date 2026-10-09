@@ -123,10 +123,10 @@ export class ShopeeShippingLabelService {
     const rawPreview = JSON.stringify(paramResponse).slice(0, 800);
 
     const info = paramResponse.response?.info_needed || {};
+    // Sem package_number: a Shopee recusa o campo em pedido não dividido
+    // ("Please don't request with package_number for this unsplit order").
+    // Só é reenviado com ele se a Shopee pedir (pedido dividido) — ver abaixo.
     const body: Record<string, any> = { order_sn: orderSn };
-    if (packageNumber) {
-      body.package_number = packageNumber;
-    }
 
     // Campos que a Shopee exige no modo escolhido. Aceita o formato antigo
     // (true) como "sem lista" por compatibilidade.
@@ -192,20 +192,33 @@ export class ShopeeShippingLabelService {
       };
     }
 
-    logger.info(`[SHOPEE LABEL] Chamando ship_order para ${orderSn}: ${JSON.stringify(body)}`);
+    let resultado = await this.chamarShipOrder(orderSn, body);
 
+    // Pedido dividido (split): a Shopee exige identificar o pacote.
+    if (!resultado.success && packageNumber && /package_number/i.test(resultado.error ?? '')) {
+      logger.info(`[SHOPEE LABEL] Shopee pediu package_number para ${orderSn} (pedido dividido). Repetindo ship_order com o pacote ${packageNumber}...`);
+      resultado = await this.chamarShipOrder(orderSn, { ...body, package_number: packageNumber });
+    }
+    if (!resultado.success) {
+      return resultado;
+    }
+
+    logger.success(`[SHOPEE LABEL] ship_order (individual) confirmado com sucesso para ${orderSn}`);
+    return { success: true };
+  }
+
+  private async chamarShipOrder(orderSn: string, body: Record<string, unknown>): Promise<{ success: boolean; error?: string }> {
+    logger.info(`[SHOPEE LABEL] Chamando ship_order para ${orderSn}: ${JSON.stringify(body)}`);
     try {
       const shipResponse = await this.httpClient.post<any>('/logistics/ship_order', body);
       logger.info(`[SHOPEE LABEL] Retorno do ship_order de ${orderSn}: ${JSON.stringify(shipResponse)}`);
       if (shipResponse.error) {
         return { success: false, error: shipResponse.message || shipResponse.error };
       }
+      return { success: true };
     } catch (error: any) {
       return { success: false, error: error.message };
     }
-
-    logger.success(`[SHOPEE LABEL] ship_order (individual) confirmado com sucesso para ${orderSn}`);
-    return { success: true };
   }
 
   private async consultarPedido(orderSn: string): Promise<{ status?: string; packageNumber?: string }> {
