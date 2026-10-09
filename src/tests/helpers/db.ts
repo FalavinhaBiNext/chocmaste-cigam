@@ -10,6 +10,7 @@ import { ProdutosCigamModel } from '@/modules/produtosCigam/models/produtosCigam
 import { ClientesCigamModel } from '@/modules/clientesCigam/models/clientesCigamModel';
 import { FormasPagamentoCigamModel } from '@/modules/formasPagamentoCigam/models/formasPagamentoCigamModel';
 import { TransportadorasCigamModel } from '@/modules/transportadorasCigam/models/transportadorasCigamModel';
+import { WebhookJobModel } from '@/modules/webhookJobs/models/webhookJobModel';
 
 export async function syncDatabase(): Promise<void> {
   await sequelize.sync({ force: true });
@@ -32,4 +33,5 @@ export {
   ClientesCigamModel,
   FormasPagamentoCigamModel,
   TransportadorasCigamModel,
+  WebhookJobModel,
 };

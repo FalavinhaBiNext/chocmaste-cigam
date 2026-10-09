@@ -78,6 +78,8 @@ import { createIntegrationsRoutes } from './modules/integrations/routes/integrat
 
 import { SyncPipelineController } from './modules/syncPipeline/controllers/syncPipelineController';
 import { createSyncPipelineRoutes } from './modules/syncPipeline/routes/syncPipeline.routes';
+import { WebhookJobController } from './modules/webhookJobs/controllers/webhookJobController';
+import { createWebhookJobRoutes } from './modules/webhookJobs/routes/webhookJobs.routes';
 
 const routes = Router();
 
@@ -113,6 +115,7 @@ const canalVendaController = container.resolve(CanalVendaController)
 const trayController = container.resolve(TrayController)
 const integrationController = container.resolve(IntegrationController)
 const syncPipelineController = container.resolve(SyncPipelineController)
+const webhookJobController = container.resolve(WebhookJobController)
 
 routes.use('/events', createEventRoutes(eventController));
 routes.use('/bling', createBlingRoutes(blingController, blingTokenController));
@@ -144,5 +147,6 @@ routes.use('/canais-venda', createCanalVendaRoutes(canalVendaController))
 routes.use('/tray', createTrayRoutes(trayController))
 routes.use('/integrations', createIntegrationsRoutes(integrationController))
 routes.use('/sync-pipeline-summary', createSyncPipelineRoutes(syncPipelineController))
+routes.use('/webhook-jobs', createWebhookJobRoutes(webhookJobController))
 
 export { routes }
