@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { asyncHandler } from '@/shared/middlewares/asyncHandler';
+import { ensureAuthenticated } from '@/shared/middlewares/ensureAuthenticated';
 import { TrayController } from '../controllers/trayController';
 
 export function createTrayRoutes(controller: TrayController): Router {
@@ -32,6 +33,9 @@ export function createTrayRoutes(controller: TrayController): Router {
 
   // Diagnóstico temporário (somente leitura)
   router.get('/debug/orders/:orderId/invoices', asyncHandler(controller.debugOrderInvoices));
+
+  // Log das chamadas de NF-e à Tray (exige login: contém o XML das notas)
+  router.get('/fiscal-logs', ensureAuthenticated, asyncHandler(controller.listFiscalLogs));
 
   // Emissor de etiqueta
   router.post('/shipping-label/register', asyncHandler(controller.registerShippingLabel));

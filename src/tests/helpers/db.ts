@@ -11,6 +11,7 @@ import { ClientesCigamModel } from '@/modules/clientesCigam/models/clientesCigam
 import { FormasPagamentoCigamModel } from '@/modules/formasPagamentoCigam/models/formasPagamentoCigamModel';
 import { TransportadorasCigamModel } from '@/modules/transportadorasCigam/models/transportadorasCigamModel';
 import { WebhookJobModel } from '@/modules/webhookJobs/models/webhookJobModel';
+import { TrayFiscalLogModel } from '@/modules/tray/models/trayFiscalLogModel';
 
 export async function syncDatabase(): Promise<void> {
   await sequelize.sync({ force: true });
@@ -34,4 +35,5 @@ export {
   FormasPagamentoCigamModel,
   TransportadorasCigamModel,
   WebhookJobModel,
+  TrayFiscalLogModel,
 };

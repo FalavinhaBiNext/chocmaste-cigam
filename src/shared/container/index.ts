@@ -244,6 +244,7 @@ import { TrayHttpClient } from '@/modules/tray/services/trayHttpClient';
 import { TrayShippingLabelService } from '@/modules/tray/services/trayShippingLabelService';
 import { TrayOrderService } from '@/modules/tray/services/trayOrderService';
 import { TrayFiscalService } from '@/modules/tray/services/trayFiscalService';
+import { TrayFiscalLogRepository } from '@/modules/tray/repositories/trayFiscalLogRepository';
 import { TrayController } from '@/modules/tray/controllers/trayController';
 
 container.registerSingleton(TrayTokenRepository);
@@ -251,6 +252,7 @@ container.registerSingleton(TrayAuthService);
 container.registerSingleton(TrayHttpClient);
 container.registerSingleton(TrayOrderService);
 container.registerSingleton(TrayShippingLabelService);
+container.registerSingleton(TrayFiscalLogRepository);
 container.registerSingleton(TrayFiscalService);
 container.registerSingleton(TrayController);
 

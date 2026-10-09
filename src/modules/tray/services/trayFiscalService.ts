@@ -1,6 +1,8 @@
 import { inject, injectable } from 'tsyringe';
-import { TrayHttpClient } from './trayHttpClient';
+import { TrayHttpClient, getTrayResponse } from './trayHttpClient';
 import { TrayOrderService } from './trayOrderService';
+import { TrayFiscalLogRepository } from '../repositories/trayFiscalLogRepository';
+import { TrayFiscalLogOrigem } from '../models/trayFiscalLogModel';
 import { logger } from '@/shared/utils/logger';
 
 export interface EnviarNFeTrayResult {
@@ -36,7 +38,72 @@ export class TrayFiscalService {
   constructor(
     @inject(TrayHttpClient) private readonly httpClient: TrayHttpClient,
     @inject(TrayOrderService) private readonly orderService: TrayOrderService,
+    @inject(TrayFiscalLogRepository) private readonly fiscalLogRepository?: TrayFiscalLogRepository,
   ) {}
+
+  /**
+   * Faz a chamada de NF-e à Tray e registra request + resposta (status HTTP e
+   * corpo) em tray_fiscal_logs — com sucesso ou com erro. É o registro usado
+   * para diagnóstico e para responder ao suporte da Tray.
+   */
+  private async chamarTray<T>(
+    metodo: 'POST' | 'PUT',
+    origem: TrayFiscalLogOrigem,
+    orderId: string,
+    invoiceId: string | null,
+    path: string,
+    body: unknown,
+  ): Promise<T> {
+    const inicio = Date.now();
+    try {
+      const resposta = await this.httpClient.send<T>(metodo, path, body);
+      const idRetornado = (resposta.data as any)?.id;
+      logger.info(`[TRAY FISCAL] Retorno da Tray — ${metodo} ${path}: HTTP ${resposta.status} ${JSON.stringify(resposta.data)}`);
+      await this.registrarLog({
+        metodo,
+        origem,
+        order_id: orderId,
+        invoice_id: invoiceId ?? (idRetornado !== undefined ? String(idRetornado) : null),
+        url: resposta.url,
+        request_body: body,
+        http_status: resposta.status,
+        response_body: resposta.data,
+        sucesso: true,
+        duracao_ms: Date.now() - inicio,
+      });
+      return resposta.data;
+    } catch (error: any) {
+      const trayResponse = getTrayResponse(error);
+      logger.error(
+        `[TRAY FISCAL] Retorno da Tray — ${metodo} ${path}: ` +
+        `HTTP ${trayResponse?.status ?? 'sem resposta'} ${trayResponse ? JSON.stringify(trayResponse.data) : error.message}`,
+      );
+      await this.registrarLog({
+        metodo,
+        origem,
+        order_id: orderId,
+        invoice_id: invoiceId,
+        url: path,
+        request_body: body,
+        http_status: trayResponse?.status ?? null,
+        response_body: trayResponse?.data ?? null,
+        sucesso: false,
+        erro: error.message,
+        duracao_ms: Date.now() - inicio,
+      });
+      throw error;
+    }
+  }
+
+  /** Grava o log sem nunca interromper o envio da NF-e. */
+  private async registrarLog(data: Parameters<TrayFiscalLogRepository['create']>[0]): Promise<void> {
+    if (!this.fiscalLogRepository) return;
+    try {
+      await this.fiscalLogRepository.create(data);
+    } catch (error: any) {
+      logger.warn(`[TRAY FISCAL] Falha ao gravar log da chamada ${data.metodo} do pedido ${data.order_id}: ${error.message}`);
+    }
+  }
 
   private extrairValorXml(xml?: string | null): number | null {
     if (!xml) return null;
@@ -191,13 +258,6 @@ export class TrayFiscalService {
   }
 
   /**
-   * Loga a resposta bruta devolvida pela Tray após enviar/atualizar a NF-e.
-   */
-  private logRetornoTray(rota: string, resposta: unknown): void {
-    logger.info(`[TRAY FISCAL] Retorno da Tray — ${rota}: ${JSON.stringify(resposta)}`);
-  }
-
-  /**
    * Registra a NF-e no pedido Tray via POST /orders/:order_id/invoices.
    * A Tray espera o wrapper OrderInvoice com: number, serie, issue_date (YYYY-MM-DD),
    * key (44 dígitos) e value (numérico).
@@ -223,11 +283,15 @@ export class TrayFiscalService {
 
     try {
       logger.info(`[TRAY FISCAL] Enviando NF-e à Tray — ${rotaEnvio}`);
-      const resposta = await this.httpClient.post<{ id?: string | number }>(`/orders/${orderId}/invoices`, {
-        OrderInvoice: orderInvoice,
-      });
+      const resposta = await this.chamarTray<{ id?: string | number }>(
+        'POST',
+        'envio',
+        orderId,
+        null,
+        `/orders/${orderId}/invoices`,
+        { OrderInvoice: orderInvoice },
+      );
 
-      this.logRetornoTray(rotaEnvio, resposta);
       logger.success(`[TRAY FISCAL] SUCESSO — NF-e registrada no pedido Tray ${orderId}`);
 
       const statusFaturadoId = process.env.TRAY_STATUS_FATURADO_ID;
@@ -268,7 +332,7 @@ export class TrayFiscalService {
     logger.info(`[TRAY FISCAL] Atualização automática da NF-e ${invoiceId} do pedido ${orderId} agendada para daqui a ${ATRASO_ATUALIZACAO_NFE_MS / 1000}s`);
 
     const timer = setTimeout(() => {
-      this.atualizarNFe(orderId, invoiceId, nota)
+      this.atualizarNFe(orderId, invoiceId, nota, 'atualizacao_automatica')
         .then((resultado) => {
           if (resultado.success) {
             logger.success(`[TRAY FISCAL] SUCESSO — atualização automática da NF-e ${invoiceId} do pedido ${orderId} concluída`);
@@ -293,7 +357,12 @@ export class TrayFiscalService {
    * direto na raiz do body (sem o wrapper OrderInvoice) — e na prática a Tray
    * rejeita o wrapper aqui com "Invalid parameter id.", então enviamos sem ele.
    */
-  async atualizarNFe(orderId: string, invoiceId: string, nota: NotaFiscalTrayInput): Promise<EnviarNFeTrayResult> {
+  async atualizarNFe(
+    orderId: string,
+    invoiceId: string,
+    nota: NotaFiscalTrayInput,
+    origem: TrayFiscalLogOrigem = 'atualizacao_manual',
+  ): Promise<EnviarNFeTrayResult> {
     logger.info(`[TRAY FISCAL] NF-e recebida para atualização — invoice ${invoiceId}, pedido ${orderId} (número=${nota.numero}, série=${nota.serie})`);
 
     const erroValidacao = this.validarNota(nota);
@@ -314,9 +383,8 @@ export class TrayFiscalService {
 
     try {
       logger.info(`[TRAY FISCAL] Enviando atualização da NF-e à Tray — ${rotaAtualizacao}`);
-      const resposta = await this.httpClient.put(`/orders/${orderId}/invoices/${invoiceId}`, orderInvoice);
+      await this.chamarTray('PUT', origem, orderId, invoiceId, `/orders/${orderId}/invoices/${invoiceId}`, orderInvoice);
 
-      this.logRetornoTray(rotaAtualizacao, resposta);
       logger.success(`[TRAY FISCAL] SUCESSO — NF-e ${invoiceId} atualizada no pedido Tray ${orderId}`);
       return { success: true, invoiceId };
     } catch (error: any) {
@@ -324,4 +392,54 @@ export class TrayFiscalService {
       return { success: false, error: error.message };
     }
   }
+
+  /**
+   * Lista as chamadas de NF-e registradas (mais recentes primeiro), com os
+   * bodies já convertidos de volta para JSON. O XML da nota (xml_danfe) vem
+   * resumido, a menos que incluirXml seja true.
+   */
+  async listarLogs(orderId?: string, incluirXml = false, limit = 50) {
+    if (!this.fiscalLogRepository) return [];
+    const logs = orderId
+      ? await this.fiscalLogRepository.findByOrderId(orderId, limit)
+      : await this.fiscalLogRepository.findRecent(limit);
+
+    return logs.map((log) => ({
+      id: log.id,
+      data_hora: log.created_at,
+      metodo: log.metodo,
+      origem: log.origem,
+      order_id: log.order_id,
+      invoice_id: log.invoice_id,
+      url: log.url,
+      http_status: log.http_status,
+      sucesso: log.sucesso,
+      erro: log.erro,
+      duracao_ms: log.duracao_ms,
+      request_body: resumirXml(parseJson(log.request_body), incluirXml),
+      response_body: parseJson(log.response_body),
+    }));
+  }
+}
+
+function parseJson(valor: string | null): unknown {
+  if (valor === null) return null;
+  try {
+    return JSON.parse(valor);
+  } catch {
+    return valor;
+  }
+}
+
+/** Troca o XML da nota por um resumo (tamanho), mantendo o restante do body. */
+function resumirXml(body: unknown, incluirXml: boolean): unknown {
+  if (incluirXml || !body || typeof body !== 'object') return body;
+  const resumir = (obj: Record<string, unknown>) =>
+    typeof obj.xml_danfe === 'string'
+      ? { ...obj, xml_danfe: `<xml omitido, ${obj.xml_danfe.length} caracteres — use incluirXml=true para ver>` }
+      : obj;
+  const b = body as Record<string, unknown>;
+  return b.OrderInvoice && typeof b.OrderInvoice === 'object'
+    ? { ...b, OrderInvoice: resumir(b.OrderInvoice as Record<string, unknown>) }
+    : resumir(b);
 }

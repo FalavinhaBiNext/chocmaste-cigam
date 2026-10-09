@@ -6,7 +6,7 @@ vi.mock('../repositories/trayTokenRepository', () => ({
 }));
 vi.mock('axios');
 
-import { TrayHttpClient } from '../services/trayHttpClient';
+import { TrayHttpClient, getTrayResponse } from '../services/trayHttpClient';
 
 const mockedAxios = vi.mocked(axios, true);
 
@@ -84,5 +84,27 @@ describe('TrayHttpClient - tratamento de erros', () => {
     });
 
     await expect(httpClient.post('/test', {})).rejects.toThrow('Erro específico da Tray sem causes');
+  });
+
+  it('anexa ao erro o status e o corpo originais devolvidos pela Tray', async () => {
+    const data = { message: 'Bad Request', causes: ['Invalid parameter id.'] };
+    mockedAxios.request.mockRejectedValueOnce({ response: { status: 400, data } });
+
+    const error = await httpClient.post('/orders/1/invoices', {}).catch((e) => e);
+
+    expect(getTrayResponse(error)).toEqual({ status: 400, data });
+  });
+
+  it('send devolve status, corpo e a URL chamada sem o access_token', async () => {
+    mockedAxios.request.mockResolvedValueOnce({ status: 201, data: { message: 'Created', id: 9 } });
+
+    const resposta = await httpClient.send('POST', '/orders/309215/invoices', { OrderInvoice: {} });
+
+    expect(resposta).toEqual({
+      status: 201,
+      data: { message: 'Created', id: 9 },
+      url: 'https://api.tray.com.br/orders/309215/invoices',
+    });
+    expect(resposta.url).not.toContain('access_token');
   });
 });

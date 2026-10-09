@@ -5,6 +5,7 @@ import { TrayTokenRepository } from '../repositories/trayTokenRepository';
 import { TrayHttpClient } from '../services/trayHttpClient';
 import { TrayShippingLabelService } from '../services/trayShippingLabelService';
 import { TrayOrderService } from '../services/trayOrderService';
+import { TrayFiscalService } from '../services/trayFiscalService';
 import { logger } from '@/shared/utils/logger';
 import { ValidationError } from '@/shared/errors/AppError';
 
@@ -16,6 +17,7 @@ export class TrayController {
     @inject(TrayHttpClient) private readonly httpClient: TrayHttpClient,
     @inject(TrayShippingLabelService) private readonly shippingLabelService: TrayShippingLabelService,
     @inject(TrayOrderService) private readonly orderService: TrayOrderService,
+    @inject(TrayFiscalService) private readonly fiscalService: TrayFiscalService,
   ) {}
 
   /**
@@ -338,6 +340,24 @@ export class TrayController {
     res.status(200).json({
       success: true,
       data: result,
+    });
+  };
+
+  /**
+   * Histórico das chamadas de NF-e feitas à Tray (POST/PUT), com o body enviado
+   * e a resposta da plataforma — para diagnóstico e para o suporte da Tray.
+   * GET /tray/fiscal-logs?pedido=309215&incluirXml=true
+   */
+  listFiscalLogs = async (req: Request, res: Response) => {
+    const pedido = req.query.pedido ? String(req.query.pedido) : undefined;
+    const incluirXml = String(req.query.incluirXml) === 'true';
+    const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 200);
+
+    const logs = await this.fiscalService.listarLogs(pedido, incluirXml, limit);
+
+    res.status(200).json({
+      success: true,
+      data: logs,
     });
   };
 }

@@ -14,6 +14,19 @@ import {
   ValidationError,
 } from '@/shared/errors/AppError';
 
+export interface TrayRawResponse<T> {
+  status: number;
+  data: T;
+  /** URL chamada, sem o access_token (que vai em params). */
+  url: string;
+}
+
+/** Resposta original da Tray anexada aos erros lançados pelo TrayHttpClient. */
+export function getTrayResponse(error: unknown): { status: number; data: unknown } | null {
+  const response = (error as any)?.trayResponse;
+  return response && typeof response.status === 'number' ? response : null;
+}
+
 @injectable()
 export class TrayHttpClient {
   constructor(
@@ -57,14 +70,28 @@ export class TrayHttpClient {
     return this.request<T>('DELETE', url, config);
   }
 
-  private async request<T>(
+  /**
+   * Igual a post/put/get, mas devolve também o status HTTP e a URL chamada
+   * (sem o access_token) — usado onde a resposta precisa ser registrada, como
+   * no envio de NF-e. Em caso de erro, o erro lançado traz `trayResponse`.
+   */
+  async send<T>(method: 'GET' | 'POST' | 'PUT' | 'DELETE', url: string, data?: any): Promise<TrayRawResponse<T>> {
+    return this.requestFull<T>(method, url, undefined, data);
+  }
+
+  private async request<T>(method: string, url: string, config?: AxiosRequestConfig, data?: any): Promise<T> {
+    const response = await this.requestFull<T>(method, url, config, data);
+    return response.data;
+  }
+
+  private async requestFull<T>(
     method: string,
     url: string,
     config?: AxiosRequestConfig,
     data?: any,
     retries = 3,
     delayMs = 1000,
-  ): Promise<T> {
+  ): Promise<TrayRawResponse<T>> {
     const { apiAddress, accessToken } = await this.ensureValidToken();
 
     const cleanAddress = apiAddress.replace(/^https?:\/\//, '').replace(/\/+$/, '');
@@ -82,7 +109,7 @@ export class TrayHttpClient {
         params: { ...config?.params, access_token: accessToken },
       });
 
-      return response.data;
+      return { status: response.status, data: response.data, url: fullUrl };
     } catch (error: any) {
       const errorCode = Number(error.response?.data?.error_code);
 
@@ -100,10 +127,14 @@ export class TrayHttpClient {
             ...config,
             params: { ...config?.params, access_token: refreshed.access_token },
           });
-          return retryResponse.data;
-        } catch (refreshError) {
+          return { status: retryResponse.status, data: retryResponse.data, url: retryUrl };
+        } catch (refreshError: any) {
           if (refreshError instanceof RefreshTokenExpiredError) {
             throw refreshError;
+          }
+          // Se a falha veio da própria requisição repetida, preserva a resposta da Tray.
+          if (refreshError?.response) {
+            throw this.mapError(refreshError, Number(refreshError.response?.data?.error_code));
           }
           throw new UnauthorizedIntegrationError('Token Tray inválido e renovação automática falhou.');
         }
@@ -114,7 +145,7 @@ export class TrayHttpClient {
           `[TRAY API] Limite de requisições atingido (429) em ${method} ${url}. Aguardando ${delayMs}ms. Tentativas restantes: ${retries}`,
         );
         await new Promise(resolve => setTimeout(resolve, delayMs));
-        return this.request<T>(method, url, config, data, retries - 1, delayMs * 2);
+        return this.requestFull<T>(method, url, config, data, retries - 1, delayMs * 2);
       }
 
       throw this.mapError(error, errorCode);
@@ -122,6 +153,16 @@ export class TrayHttpClient {
   }
 
   private mapError(error: any, errorCode?: number): Error {
+    const mapped = this.toAppError(error, errorCode);
+    // Anexa a resposta original da Tray (status + corpo) para quem precisar
+    // registrá-la — ex.: o log de envio de NF-e pedido pelo suporte da Tray.
+    if (error?.response) {
+      (mapped as any).trayResponse = { status: error.response.status, data: error.response.data };
+    }
+    return mapped;
+  }
+
+  private toAppError(error: any, errorCode?: number): Error {
     const status = error.response?.status;
     const data: TrayErrorResponse | undefined = error.response?.data;
     const causesText = Array.isArray(data?.causes)
