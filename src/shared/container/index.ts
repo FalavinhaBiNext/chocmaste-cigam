@@ -19,6 +19,8 @@ import { WebhookJobController } from '@/modules/webhookJobs/controllers/webhookJ
 import { BlingTokenController } from '@/modules/bling/controllers/blingTokenController';
 import { ContatosService } from '@/modules/bling/services/contatosService';
 import { ContatosController } from '@/modules/bling/controllers/contatosController';
+import { PedidosBlingService } from '@/modules/bling/services/pedidosBlingService';
+import { PedidosBlingController } from '@/modules/bling/controllers/pedidosBlingController';
 import { FormaPagamentoBlingService } from '@/modules/bling/services/formaPagamentoBlingService';
 import { BlingSyncService } from '@/modules/bling/services/blingSyncService';
 import { BlingSyncController } from '@/modules/bling/controllers/blingSyncController';
@@ -96,6 +98,8 @@ container.registerSingleton(WebhookJobController);
 container.registerSingleton(BlingTokenController);
 container.registerSingleton(ContatosService);
 container.registerSingleton(ContatosController);
+container.registerSingleton(PedidosBlingService);
+container.registerSingleton(PedidosBlingController);
 container.registerSingleton(FormaPagamentoBlingService);
 container.registerSingleton(BlingSyncService);
 container.registerSingleton(BlingSyncController);

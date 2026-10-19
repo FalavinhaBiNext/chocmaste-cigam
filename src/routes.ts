@@ -13,6 +13,8 @@ import { WebhookController } from './modules/bling/controllers/webhookController
 import { createWebhookRoutes } from './modules/bling/routes/webhook.routes';
 import { ContatosController } from './modules/bling/controllers/contatosController';
 import { createContatosRoutes } from './modules/bling/routes/contatos.routes';
+import { PedidosBlingController } from './modules/bling/controllers/pedidosBlingController';
+import { createPedidosBlingRoutes } from './modules/bling/routes/pedidosBling.routes';
 import { UsuarioCigamController } from './modules/usuarioCigam/controllers/UsuarioCigamController';
 import { createUsuarioCigamRoutes } from './modules/usuarioCigam/routers/UsuarioCigam.routes';
 import { CigamController } from './modules/cigam/controllers/cigamController';
@@ -98,6 +100,7 @@ const pedidoProdutoController = container.resolve(PedidoProdutoController)
 const formaPagamentoController = container.resolve(FormaPagamentoController)
 const transportadoraController = container.resolve(TransportadoraController)
 const contatosController = container.resolve(ContatosController)
+const pedidosBlingController = container.resolve(PedidosBlingController)
 const clientesController = container.resolve(ClientesController)
 const produtosCigamController = container.resolve(ProdutosCigamController)
 const clientesCigamController = container.resolve(ClientesCigamController)
@@ -123,6 +126,7 @@ routes.use('/bling/sync', createBlingSyncRoutes(blingSyncController));
 routes.use('/bling', createWebhookRoutes(webhookController));
 routes.use('/bling/produtos', createProdutosRoutes(produtosController));
 routes.use('/bling/contatos', createContatosRoutes(contatosController));
+routes.use('/bling/pedidos', createPedidosBlingRoutes(pedidosBlingController));
 routes.use('/cigam/usuarios', createUsuarioCigamRoutes(usuariosCigamController))
 routes.use('/cigam', createCigamRoutes(cigamController, cigamWebhookController))
 routes.use('/pedidos', createPedidoRoutes(pedidoController))
