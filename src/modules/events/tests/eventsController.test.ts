@@ -18,15 +18,13 @@ describe('EventController', () => {
   let webhookSvc: any;
   let blingHttpClient: any;
   let cigamPedidoService: any;
-  let deParaUnidadesNegocioRepo: any;
 
   beforeEach(() => {
     svc = { create: vi.fn(), findAll: vi.fn(), findById: vi.fn(), findByPedido: vi.fn(), findByNumeroPedido: vi.fn(), delete: vi.fn(), markSyncSuccess: vi.fn(), markSyncFailure: vi.fn() };
     webhookSvc = { processarPedidoCriado: vi.fn() };
     blingHttpClient = { getPedido: vi.fn() };
     cigamPedidoService = { enviarPedido: vi.fn() };
-    deParaUnidadesNegocioRepo = { findByCompanyIdBling: vi.fn() };
-    ctrl = new EventController(svc as any, webhookSvc, blingHttpClient, cigamPedidoService, deParaUnidadesNegocioRepo);
+    ctrl = new EventController(svc as any, webhookSvc, blingHttpClient, cigamPedidoService);
   });
 
   it('health', () => {
@@ -146,7 +144,9 @@ describe('EventController', () => {
     try { await firstCall; } catch {}
   });
 
-  it('retryCigamSync prioriza unidade de negocio da loja do pedido Bling sobre company_id', async () => {
+  it('retryCigamSync usa apenas CIGAM_DEFAULT_UNIDADE_NEGOCIO como unidade de negocio', async () => {
+    const originalEnv = process.env.CIGAM_DEFAULT_UNIDADE_NEGOCIO;
+    process.env.CIGAM_DEFAULT_UNIDADE_NEGOCIO = '002';
     svc.findById.mockResolvedValue({
       id: 'evt-retry-1',
       cigam_sincronizado: false,
@@ -162,11 +162,6 @@ describe('EventController', () => {
         }
       }
     });
-    deParaUnidadesNegocioRepo.findByCompanyIdBling.mockImplementation((id: string) => {
-      if (id === '941369') return Promise.resolve({ unidade_negocio: '002' });
-      if (id === 'tenant-matriz') return Promise.resolve({ unidade_negocio: '001' });
-      return Promise.resolve(null);
-    });
     cigamPedidoService.enviarPedido.mockResolvedValue('CIGAM-002');
 
     const req = mockReq({ params: { id: 'evt-retry-1' } }) as Request;
@@ -181,5 +176,6 @@ describe('EventController', () => {
       'evt-retry-1'
     );
     expect(res.status).toHaveBeenCalledWith(200);
+    process.env.CIGAM_DEFAULT_UNIDADE_NEGOCIO = originalEnv;
   });
 });

@@ -212,7 +212,7 @@ export class CigamPedidoService {
         PrazoEntrega: prazo,
         PrazoProgramado: prazoProgramado,
         OrigemPedido: 'Bling Integration',
-        UnidadeNegocio: unidadeNegocio || process.env.CIGAM_DEFAULT_UNIDADE_NEGOCIO || '',
+        UnidadeNegocio: process.env.CIGAM_DEFAULT_UNIDADE_NEGOCIO || '',
         ...(codigoConta ? { CodigoConta: codigoConta } : {}),
       };
 

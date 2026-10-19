@@ -116,45 +116,16 @@ describe('WebhookService - Resolução de Unidade de Negócio do Pedido Bling', 
     process.env.CIGAM_DEFAULT_UNIDADE_NEGOCIO = originalEnv;
   });
 
-  it('deve priorizar a unidade de negócio informada no pedido Bling (ex: 941369 -> 002) mesmo quando companyId estiver mapeado para 001', async () => {
+  it('deve usar CIGAM_DEFAULT_UNIDADE_NEGOCIO mesmo quando a loja do pedido e o companyId possuírem De-Para', async () => {
+    process.env.CIGAM_DEFAULT_UNIDADE_NEGOCIO = '003';
+
     const pedidoData = buildPedidoBlingData({
       id: 203345026,
       unidadeNegocio: { id: 941369 },
     });
 
     const deParaMap = {
-      '941369': '002', // Indústria
-      'f46afdc1cc617537a402af81c928bd37': '001', // Tenant Matriz
-    };
-
-    const { service, pedidoService, cigamPedidoService } = buildWebhookService(deParaMap, pedidoData);
-
-    await service.processarPedidoCriado(buildPayload());
-
-    // Deve salvar no pedido local com unidade 002
-    expect(pedidoService.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        unidade_negocio: '002',
-      })
-    );
-
-    // Deve enviar ao CIGAM com unidade 002
-    expect(cigamPedidoService.enviarPedido).toHaveBeenCalledWith(
-      expect.anything(),
-      '002',
-      undefined,
-      undefined,
-      'evento-uuid'
-    );
-  });
-
-  it('deve fazer fallback para companyId quando pedido Bling não tiver unidadeNegocio informada', async () => {
-    const pedidoData = buildPedidoBlingData({
-      id: 203345026,
-      // sem unidadeNegocio
-    });
-
-    const deParaMap = {
+      '941369': '002',
       'f46afdc1cc617537a402af81c928bd37': '001',
     };
 
@@ -164,42 +135,34 @@ describe('WebhookService - Resolução de Unidade de Negócio do Pedido Bling', 
 
     expect(pedidoService.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        unidade_negocio: '001',
+        unidade_negocio: '003',
       })
     );
 
     expect(cigamPedidoService.enviarPedido).toHaveBeenCalledWith(
       expect.anything(),
-      '001',
+      '003',
       undefined,
       undefined,
       'evento-uuid'
     );
   });
 
-  it('deve fazer fallback para CIGAM_DEFAULT_UNIDADE_NEGOCIO quando nem unidade do pedido nem companyId tiverem mapeamento', async () => {
-    process.env.CIGAM_DEFAULT_UNIDADE_NEGOCIO = '001';
+  it('deve seguir sem unidade de negócio quando CIGAM_DEFAULT_UNIDADE_NEGOCIO não estiver configurada', async () => {
+    delete process.env.CIGAM_DEFAULT_UNIDADE_NEGOCIO;
 
     const pedidoData = buildPedidoBlingData({
       id: 203345026,
-      unidadeNegocio: { id: 999999 }, // sem mapeamento
+      unidadeNegocio: { id: 941369 },
     });
 
-    const deParaMap = {}; // vazio
+    const { service, cigamPedidoService } = buildWebhookService({ '941369': '002' }, pedidoData);
 
-    const { service, pedidoService, cigamPedidoService } = buildWebhookService(deParaMap, pedidoData);
-
-    await service.processarPedidoCriado(buildPayload('company-desconhecido'));
-
-    expect(pedidoService.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        unidade_negocio: '001',
-      })
-    );
+    await service.processarPedidoCriado(buildPayload());
 
     expect(cigamPedidoService.enviarPedido).toHaveBeenCalledWith(
       expect.anything(),
-      '001',
+      undefined,
       undefined,
       undefined,
       'evento-uuid'

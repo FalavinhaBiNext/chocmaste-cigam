@@ -127,36 +127,12 @@ export class WebhookService {
     const descontoValor = typeof data.desconto === 'object' && data.desconto !== null ? (data.desconto.valor ?? 0) : (Number(data.desconto) || 0);
     const documentoCliente = data.contato.numeroDocumento || data.contato.cpfCnpj || '';
 
-    let unidadeNegocio: string | undefined;
-
-    // 1. Tentar resolver a partir da Unidade de Negócio informada na loja do pedido Bling
-    const idUnidadeBling = data.loja?.unidadeNegocio?.id ? String(data.loja.unidadeNegocio.id) : undefined;
-    if (idUnidadeBling) {
-      const mappingUnidade = await this.deParaUnidadesNegocioRepo.findByCompanyIdBling(idUnidadeBling);
-      if (mappingUnidade) {
-        unidadeNegocio = mappingUnidade.unidade_negocio;
-        logger.webhook(`Unidade de negócio mapeada via pedido Bling: unidadeId ${idUnidadeBling} -> ${unidadeNegocio}`);
-      } else {
-        logger.webhook(`Nenhum mapeamento encontrado para a unidade do pedido Bling: ${idUnidadeBling}`);
-      }
-    }
-
-    // 2. Fallback: buscar a partir do companyId da conta Bling (tenant)
-    const companyId = payload.companyId;
-    if (!unidadeNegocio && companyId) {
-      const mapping = await this.deParaUnidadesNegocioRepo.findByCompanyIdBling(companyId);
-      if (mapping) {
-        unidadeNegocio = mapping.unidade_negocio;
-        logger.webhook(`Unidade de negócio mapeada via companyId: ${companyId} -> ${unidadeNegocio}`);
-      } else {
-        logger.webhook(`Nenhum mapeamento de unidade encontrado para companyId: ${companyId}`);
-      }
-    }
-
-    // 3. Fallback final: CIGAM_DEFAULT_UNIDADE_NEGOCIO configurado no ambiente
-    if (!unidadeNegocio && process.env.CIGAM_DEFAULT_UNIDADE_NEGOCIO) {
-      unidadeNegocio = process.env.CIGAM_DEFAULT_UNIDADE_NEGOCIO;
-      logger.webhook(`Unidade de negócio fallback para default configurado: ${unidadeNegocio}`);
+    // Unidade de negócio do pedido vem exclusivamente da configuração do servidor
+    const unidadeNegocio = process.env.CIGAM_DEFAULT_UNIDADE_NEGOCIO || undefined;
+    if (unidadeNegocio) {
+      logger.webhook(`Unidade de negócio do pedido (CIGAM_DEFAULT_UNIDADE_NEGOCIO): ${unidadeNegocio}`);
+    } else {
+      logger.warn('CIGAM_DEFAULT_UNIDADE_NEGOCIO não configurada. Pedido seguirá sem unidade de negócio.');
     }
 
     // Buscar codigo_conta a partir do canal de venda (loja)
