@@ -123,10 +123,11 @@ export class CigamPedidoService {
 
     // 3. Resolução da Forma de Pagamento
     let idCondicaoPagamentoCigam = '';
+    let idFormaBling = '';
     if (pedidoBling.parcelas && pedidoBling.parcelas.length > 0) {
       const primeiraParcela = pedidoBling.parcelas[0];
       if (primeiraParcela.formaPagamento?.id) {
-        const idFormaBling = String(primeiraParcela.formaPagamento.id);
+        idFormaBling = String(primeiraParcela.formaPagamento.id);
         const mapForma = await this.deParaFormasPagamentoRepo.findByIdBling(idFormaBling);
         if (!mapForma) {
           throw new Error(`Forma de pagamento (ID Bling: ${idFormaBling}) não possui mapeamento De-Para para o CIGAM.`);
@@ -171,6 +172,31 @@ export class CigamPedidoService {
     const totalProdutos = Number(pedidoBling.totalProdutos)
       || itensMapeados.reduce((soma, item) => soma + (Number(item.valorTotal) || 0), 0);
     const percentualDesconto = calcularPercentualDesconto(descontoValor, totalProdutos);
+
+    const resumoEnvio = {
+      pedidoBling: { id: pedidoBling.id, numero: pedidoBling.numero, data: pedidoBling.data, idLoja: pedidoBling.loja?.id ?? null },
+      ambiente,
+      unidadeNegocio: process.env.CIGAM_DEFAULT_UNIDADE_NEGOCIO || '',
+      codigoConta: codigoConta ?? null,
+      codigoPedidoCigamExistente: codigoPedidoCigam,
+      cliente: { idBling: idClienteBling, nome: pedidoBling.contato?.nome ?? null, codigoCigam: idClienteCigam },
+      transportadora: { idBling: idTranspBling ?? null, codigoCigam: idTransportadoraCigam || null },
+      formaPagamento: {
+        idBling: idFormaBling || null,
+        descricaoBling: pedidoBling.parcelas?.[0]?.formaPagamento?.descricao ?? null,
+        codigoCondicaoPagamentoCigam: idCondicaoPagamentoCigam || null,
+        quantidadeParcelas: pedidoBling.parcelas?.length ?? 0,
+      },
+      itens: itensMapeados.map(item => ({
+        idProdutoBling: item.idProdutoBling,
+        codigoMaterialCigam: item.idMaterialCigam,
+        quantidade: item.quantidade,
+        valorUnitario: item.valorUnitario,
+        valorTotal: item.valorTotal,
+      })),
+      valores: { totalProdutos, desconto: descontoValor, percentualDesconto, frete: valorFrete, outrasDespesas, totalPedido: pedidoBling.total ?? null },
+    };
+    logger.info(`Dados do pedido Bling #${pedidoBling.numero} a serem enviados ao CIGAM: ${JSON.stringify(resumoEnvio)}`);
 
     // 6. Montar o payload da Capa do Pedido e criar apenas se não existir
     if (!codigoPedidoCigam) {
@@ -217,6 +243,7 @@ export class CigamPedidoService {
       };
 
       logger.info(`Enviando capa do pedido #${pedidoBling.numero} para o CIGAM...`);
+      logger.info(`Payload da capa do pedido #${pedidoBling.numero}: ${JSON.stringify(payloadCapa)}`);
       const responseCapa: any = await this.cigamHttpClient.post(
         baseUrl,
         ambiente,
@@ -227,6 +254,7 @@ export class CigamPedidoService {
       // CIGAM retorna HTTP 200 com { success: false, messages: [...] } em caso de falha de validação/regra de negócio
       if (responseCapa && responseCapa.success === false) {
         const erros = Array.isArray(responseCapa.messages) ? responseCapa.messages.join(' | ') : (responseCapa.message || 'Erro na API do CIGAM');
+        logger.error(`CIGAM rejeitou a capa do pedido #${pedidoBling.numero}. Payload enviado: ${JSON.stringify(payloadCapa)}`);
         throw new Error(`CIGAM rejeitou a criação da capa do pedido #${pedidoBling.numero}: ${erros}`);
       }
 
@@ -331,7 +359,7 @@ export class CigamPedidoService {
       };
 
       logger.info(`Adicionando item (Material CIGAM: ${item.idMaterialCigam}) ao pedido CIGAM #${codigoPedidoCigam}...`);
-      logger.info('Payload do item CIGAM', payloadItem);
+      logger.info(`Payload do item CIGAM: ${JSON.stringify(payloadItem)}`);
       const responseItem: any = await this.cigamHttpClient.post(
         baseUrl,
         ambiente,
