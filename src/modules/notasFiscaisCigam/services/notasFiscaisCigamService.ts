@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { injectable, inject } from 'tsyringe';
 import { NotasFiscaisCigamRepository } from '../repositories/notasFiscaisCigamRepository';
 import { PedidoService } from '@/modules/pedido/services/pedidoService';
@@ -411,6 +412,9 @@ export class NotasFiscaisCigamService {
     }
 
     let resultado: { success: boolean; error?: string; invoiceId?: string };
+    // Envio para a Tray: ID curto para rastrear todas as linhas deste clique
+    // ("Enviar XML") no log do servidor, inclusive o PUT automático depois.
+    let envioTray: { id: string; tag: string; inicio: number } | null = null;
 
     if (nota.marketplace === 'shopee') {
       if (!nota.numero_pedido_marketplace) {
@@ -437,31 +441,67 @@ export class NotasFiscaisCigamService {
       // observações do Bling (AMAZON, MAGAZINE LUIZA, LOJA VIRTUAL, PARTICULAR, etc.)
       // — são todos canais vendidos através da mesma loja Tray, então passam pela
       // mesma API de NF-e da Tray, usando numero_pedido_marketplace como order_id.
+      const envioId = randomUUID().slice(0, 8);
+      envioTray = { id: envioId, tag: `[TRAY ENVIO ${envioId}]`, inicio: Date.now() };
+      const t = envioTray.tag;
+
+      logger.info(
+        `${t} Início do envio de XML para a Tray (botão "Enviar XML") — NF-e ${nota.id} | ` +
+        `NF ${nota.numero_nf ?? '-'}/série ${nota.serie_nf ?? '-'} | chave ${nota.chave_acesso ?? '-'} | ` +
+        `faturamento ${nota.data_faturamento ?? '-'} | pedido CIGAM #${nota.numero_pedido_cigam} | ` +
+        `canal "${nota.marketplace}" | unidade ${nota.unidade_negocio ?? '-'} | ` +
+        `XML ${nota.xml_content ? `${nota.xml_content.length} caracteres` : 'AUSENTE'} | etiqueta CIGAM ${nota.tem_etiqueta_pdf ? 'sim' : 'não'}`,
+      );
+
       if (!nota.numero_pedido_marketplace) {
+        logger.warn(`${t} Envio cancelado: a NF-e não tem número do pedido na Tray (numero_pedido_marketplace vazio).`);
         return { success: false, message: 'NF-e sem número de pedido do marketplace vinculado.' };
       }
+      logger.info(`${t} order_id na Tray (numero_pedido_marketplace) = ${nota.numero_pedido_marketplace}`);
 
       let valorPedido: number | undefined;
       try {
         const pedidoVinculado = await this.pedidoService.findByNumeroPedidoCigam(nota.numero_pedido_cigam);
+        if (pedidoVinculado) {
+          logger.info(
+            `${t} Pedido vinculado no sistema — id ${pedidoVinculado.id} | Bling ${pedidoVinculado.id_bling} | ` +
+            `nº loja ${pedidoVinculado.numero_loja} | total_venda ${pedidoVinculado.total_venda ?? '-'} | ` +
+            `marketplace ${pedidoVinculado.marketplace ?? '-'} | status_nfe ${pedidoVinculado.status_nfe ?? '-'}`,
+          );
+          if (String(pedidoVinculado.numero_loja ?? '') !== String(nota.numero_pedido_marketplace)) {
+            logger.warn(
+              `${t} ATENÇÃO — nº da loja do pedido vinculado (${pedidoVinculado.numero_loja}) é diferente do order_id usado na Tray ` +
+              `(${nota.numero_pedido_marketplace}). Confira se a NF-e está indo para o pedido certo.`,
+            );
+          }
+        } else {
+          logger.warn(`${t} Nenhum pedido no sistema com numero_pedido_cigam=${nota.numero_pedido_cigam} — o valor virá do vNF do XML.`);
+        }
         if (pedidoVinculado?.total_venda) {
           valorPedido = Number(pedidoVinculado.total_venda);
         }
-      } catch {
-        // Ignora se não localizar o pedido vinculado
+      } catch (error: any) {
+        logger.warn(`${t} Falha ao buscar o pedido vinculado (seguindo sem ele): ${error.message}`);
       }
 
-      resultado = await this.trayFiscalService.enviarNFe(nota.numero_pedido_marketplace, {
-        numero: nota.numero_nf,
-        serie: nota.serie_nf,
-        chaveAcesso: nota.chave_acesso,
-        dataFaturamento: nota.data_faturamento,
-        valor: valorPedido,
-        xml: nota.xml_content,
-      });
+      resultado = await this.trayFiscalService.enviarNFe(
+        nota.numero_pedido_marketplace,
+        {
+          numero: nota.numero_nf,
+          serie: nota.serie_nf,
+          chaveAcesso: nota.chave_acesso,
+          dataFaturamento: nota.data_faturamento,
+          valor: valorPedido,
+          xml: nota.xml_content,
+        },
+        { envioId },
+      );
     }
 
     if (!resultado.success) {
+      if (envioTray) {
+        logger.error(`${envioTray.tag} Envio NÃO concluído em ${Date.now() - envioTray.inicio}ms — a NF-e continua como não enviada. Motivo: ${resultado.error}`);
+      }
       logger.warn(`[NF-E CIGAM] Envio manual da nota ${nota.id} bloqueado: ${resultado.error}`);
       return {
         success: false,
@@ -470,10 +510,12 @@ export class NotasFiscaisCigamService {
     }
 
     await this.notasFiscaisCigamRepository.updateEnviadoMarketplace(nota.id, true);
+    if (envioTray) logger.info(`${envioTray.tag} NF-e ${nota.id} marcada como enviada ao marketplace no sistema.`);
 
     if (resultado.invoiceId) {
       try {
         await this.notasFiscaisCigamRepository.updateTrayInvoiceId(nota.id, resultado.invoiceId);
+        if (envioTray) logger.info(`${envioTray.tag} tray_invoice_id=${resultado.invoiceId} salvo na NF-e (usado pelo PUT e pelo botão "Atualizar na Tray").`);
       } catch (error: any) {
         logger.warn(`[NF-E CIGAM] Falha ao salvar tray_invoice_id da nota ${nota.id}: ${error.message}`);
       }
@@ -483,10 +525,20 @@ export class NotasFiscaisCigamService {
       const pedidoVinculado = await this.pedidoService.findByNumeroPedidoCigam(nota.numero_pedido_cigam);
       if (pedidoVinculado) {
         await this.pedidoService.update(pedidoVinculado.id, { status_nfe: 'enviada' });
+        if (envioTray) logger.info(`${envioTray.tag} Pedido ${pedidoVinculado.id} atualizado para status_nfe=enviada. Atualizando situação no Bling (pedido ${pedidoVinculado.id_bling})...`);
         await this.atualizarSituacaoBling(pedidoVinculado.id_bling, nota.numero_pedido_cigam);
+      } else if (envioTray) {
+        logger.warn(`${envioTray.tag} Sem pedido vinculado no sistema — status_nfe e situação no Bling não foram atualizados.`);
       }
     } catch (error: any) {
       logger.error(`[NF-E CIGAM] Erro ao atualizar status_nfe do pedido após envio manual: ${error.message}`);
+    }
+
+    if (envioTray) {
+      logger.success(
+        `${envioTray.tag} FIM — XML enviado à Tray em ${Date.now() - envioTray.inicio}ms. ` +
+        `Detalhes completos (body e resposta): GET /api/v1/tray/fiscal-logs?pedido=${nota.numero_pedido_marketplace}&incluirXml=true`,
+      );
     }
 
     logger.success(`[NF-E CIGAM] NF-e ${nota.id} enviada manualmente com sucesso ao marketplace ${nota.marketplace}.`);

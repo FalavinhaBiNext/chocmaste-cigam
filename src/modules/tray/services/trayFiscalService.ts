@@ -3,6 +3,7 @@ import { TrayHttpClient, getTrayResponse } from './trayHttpClient';
 import { TrayOrderService } from './trayOrderService';
 import { TrayFiscalLogRepository } from '../repositories/trayFiscalLogRepository';
 import { TrayFiscalLogOrigem } from '../models/trayFiscalLogModel';
+import { divergenciasNotaXml, resumirXmlNFe } from '../utils/nfeXmlResumo';
 import { logger } from '@/shared/utils/logger';
 
 export interface EnviarNFeTrayResult {
@@ -12,6 +13,17 @@ export interface EnviarNFeTrayResult {
 }
 
 const ATRASO_ATUALIZACAO_NFE_MS = 10_000;
+
+/** Contexto do envio iniciado pelo usuário ("Enviar XML"). */
+export interface EnvioTrayContexto {
+  /** ID curto que aparece em todas as linhas de log do mesmo envio. */
+  envioId?: string;
+}
+
+/** Prefixo dos logs: "[TRAY ENVIO <id>]" quando há envioId, senão "[TRAY FISCAL]". */
+function prefixoLog(contexto?: EnvioTrayContexto): string {
+  return contexto?.envioId ? `[TRAY ENVIO ${contexto.envioId}]` : '[TRAY FISCAL]';
+}
 
 export interface NotaFiscalTrayInput {
   numero: string | null;
@@ -53,12 +65,13 @@ export class TrayFiscalService {
     invoiceId: string | null,
     path: string,
     body: unknown,
+    p = '[TRAY FISCAL]',
   ): Promise<T> {
     const inicio = Date.now();
     try {
       const resposta = await this.httpClient.send<T>(metodo, path, body);
       const idRetornado = (resposta.data as any)?.id;
-      logger.info(`[TRAY FISCAL] Retorno da Tray — ${metodo} ${path}: HTTP ${resposta.status} ${JSON.stringify(resposta.data)}`);
+      logger.info(`${p} Retorno da Tray — ${metodo} ${path}: HTTP ${resposta.status} em ${Date.now() - inicio}ms ${JSON.stringify(resposta.data)}`);
       await this.registrarLog({
         metodo,
         origem,
@@ -75,8 +88,8 @@ export class TrayFiscalService {
     } catch (error: any) {
       const trayResponse = getTrayResponse(error);
       logger.error(
-        `[TRAY FISCAL] Retorno da Tray — ${metodo} ${path}: ` +
-        `HTTP ${trayResponse?.status ?? 'sem resposta'} ${trayResponse ? JSON.stringify(trayResponse.data) : error.message}`,
+        `${p} Retorno da Tray — ${metodo} ${path}: ` +
+        `HTTP ${trayResponse?.status ?? 'sem resposta'} em ${Date.now() - inicio}ms ${trayResponse ? JSON.stringify(trayResponse.data) : error.message}`,
       );
       await this.registrarLog({
         metodo,
@@ -120,7 +133,7 @@ export class TrayFiscalService {
    * Usa regex em vez de um parser XML completo — mesma abordagem já usada em
    * extrairValorXml — porque os blocos <det> da NF-e são planos (não aninhados).
    */
-  private extrairItensCfopXml(xml?: string | null): ItemCfopXml[] {
+  private extrairItensCfopXml(xml?: string | null, p = '[TRAY FISCAL]'): ItemCfopXml[] {
     if (!xml) return [];
     const itens: ItemCfopXml[] = [];
     const detRegex = /<det\b[^>]*>([\s\S]*?)<\/det>/g;
@@ -132,7 +145,7 @@ export class TrayFiscalService {
       if (cProdMatch && cfopMatch) {
         const cProd = cProdMatch[1].trim();
         const cfop = cfopMatch[1].trim();
-        logger.info(`[TRAY FISCAL] CFOP extraído com sucesso do XML — produto ${cProd}: CFOP ${cfop}`);
+        logger.info(`${p} CFOP extraído com sucesso do XML — produto ${cProd}: CFOP ${cfop}`);
         itens.push({ cProd, cfop });
       }
     }
@@ -147,10 +160,10 @@ export class TrayFiscalService {
    * itens no XML, se a consulta à Tray falhar, ou se nenhum item for
    * correlacionado — nesses casos a NF-e segue sem ProductCfop, como hoje.
    */
-  private async construirProductCfop(orderId: string, xml?: string | null): Promise<ProductCfopEntry[] | undefined> {
-    const itensXml = this.extrairItensCfopXml(xml);
+  private async construirProductCfop(orderId: string, xml?: string | null, p = '[TRAY FISCAL]'): Promise<ProductCfopEntry[] | undefined> {
+    const itensXml = this.extrairItensCfopXml(xml, p);
     if (itensXml.length === 0) {
-      logger.warn(`[TRAY FISCAL] Nenhum item <det> com cProd/CFOP encontrado no XML da NF-e do pedido ${orderId}`);
+      logger.warn(`${p} Nenhum item <det> com cProd/CFOP encontrado no XML da NF-e do pedido ${orderId}`);
       return undefined;
     }
 
@@ -158,11 +171,13 @@ export class TrayFiscalService {
     try {
       pedidoCompleto = await this.orderService.buscarPedidoCompleto(orderId);
     } catch (error: any) {
-      logger.warn(`[TRAY FISCAL] Falha ao buscar pedido completo ${orderId} na Tray para montar ProductCfop: ${error.message}`);
+      logger.warn(`${p} Falha ao buscar pedido completo ${orderId} na Tray para montar ProductCfop: ${error.message}`);
       return undefined;
     }
 
     const produtosVendidos = pedidoCompleto?.Order?.ProductsSold || [];
+    const referenciasTray = produtosVendidos.map((ps: any) => String(ps?.ProductsSold?.reference || '').trim() || '(sem reference)');
+    logger.info(`${p} Pedido ${orderId} na Tray tem ${produtosVendidos.length} produto(s) vendido(s); references: ${JSON.stringify(referenciasTray)}`);
     const productCfop: ProductCfopEntry[] = [];
 
     for (const item of itensXml) {
@@ -172,7 +187,7 @@ export class TrayFiscalService {
       });
 
       if (!produto) {
-        logger.warn(`[TRAY FISCAL] Pedido ${orderId}: nenhum produto da Tray com reference="${item.cProd}" — item omitido do ProductCfop`);
+        logger.warn(`${p} Pedido ${orderId}: nenhum produto da Tray com reference="${item.cProd}" (CFOP ${item.cfop}) — item omitido do ProductCfop. References disponíveis: ${JSON.stringify(referenciasTray)}`);
         continue;
       }
 
@@ -185,11 +200,11 @@ export class TrayFiscalService {
     }
 
     if (productCfop.length === 0) {
-      logger.warn(`[TRAY FISCAL] Pedido ${orderId}: nenhum item do XML foi correlacionado a produtos da Tray — ProductCfop não será enviado`);
+      logger.warn(`${p} Pedido ${orderId}: nenhum item do XML foi correlacionado a produtos da Tray — ProductCfop não será enviado`);
       return undefined;
     }
 
-    logger.info(`[TRAY FISCAL] Pedido ${orderId}: ProductCfop montado com ${productCfop.length}/${itensXml.length} item(ns): ${JSON.stringify(productCfop)}`);
+    logger.info(`${p} Pedido ${orderId}: ProductCfop montado com ${productCfop.length}/${itensXml.length} item(ns): ${JSON.stringify(productCfop)}`);
     return productCfop;
   }
 
@@ -234,13 +249,69 @@ export class TrayFiscalService {
   }
 
   /**
+   * Log detalhado do que vai ser enviado: de onde veio o valor, resumo do XML
+   * (identificação, autorização, emitente, destinatário mascarado, totais e
+   * itens) e divergências entre o registrado no sistema e o XML.
+   */
+  private logDetalhesNota(orderId: string, nota: NotaFiscalTrayInput, orderInvoice: Record<string, unknown>, p: string): void {
+    const valorEnviado = Number(orderInvoice.value) || 0;
+    const origemValor = Number(nota.valor)
+      ? `total do pedido no sistema (${Number(nota.valor).toFixed(2)})`
+      : this.extrairValorXml(nota.xml)
+        ? 'vNF do XML (pedido sem total no sistema)'
+        : 'nenhum — valor 0 (sem total no pedido e sem vNF no XML)';
+    logger.info(
+      `${p} Dados estruturados para a Tray — order_id=${orderId}, number=${orderInvoice.number}, serie=${orderInvoice.serie}, ` +
+      `issue_date=${orderInvoice.issue_date} (data de faturamento recebida: ${nota.dataFaturamento ?? 'vazia'}), ` +
+      `key=${orderInvoice.key}, value=${valorEnviado.toFixed(2)} (origem: ${origemValor})`,
+    );
+
+    const resumo = resumirXmlNFe(nota.xml);
+    if (resumo) {
+      logger.info(
+        `${p} XML da NF-e — ${resumo.tamanho} caracteres | chave ${resumo.chave ?? 'não encontrada'} | nNF ${resumo.numero ?? '-'} série ${resumo.serie ?? '-'} modelo ${resumo.modelo ?? '-'} | ` +
+        `emissão ${resumo.emissao ?? '-'} | natOp "${resumo.naturezaOperacao ?? '-'}" | ambiente ${resumo.ambiente ?? 'não informado'}`,
+      );
+      logger.info(
+        `${p} Autorização SEFAZ — ` +
+        (resumo.protocolo
+          ? `cStat ${resumo.protocolo.cStat ?? '-'} "${resumo.protocolo.motivo ?? '-'}", protocolo ${resumo.protocolo.nProt ?? '-'}`
+          : 'XML sem protocolo (infProt)'),
+      );
+      logger.info(
+        `${p} Emitente CNPJ ${resumo.emitente.cnpj ?? '-'} (${resumo.emitente.nome ?? '-'}/${resumo.emitente.uf ?? '-'}) → ` +
+        `Destinatário ${resumo.destinatario.documento ?? '-'} (${resumo.destinatario.municipio ?? '-'}/${resumo.destinatario.uf ?? '-'}, CEP ${resumo.destinatario.cep ?? '-'})`,
+      );
+      logger.info(
+        `${p} Totais do XML — vNF ${resumo.totais.vNF ?? '-'} | vProd ${resumo.totais.vProd ?? '-'} | vFrete ${resumo.totais.vFrete ?? '-'} | vDesc ${resumo.totais.vDesc ?? '-'} | ${resumo.itens.length} item(ns)`,
+      );
+      for (const item of resumo.itens) {
+        logger.info(
+          `${p}   item ${item.item}: cProd ${item.cProd ?? '-'} | CFOP ${item.cfop ?? '-'} | qtd ${item.qCom ?? '-'} | vProd ${item.vProd ?? '-'} | ${item.xProd ?? ''}`,
+        );
+      }
+    }
+
+    const divergencias = divergenciasNotaXml(
+      { numero: nota.numero, serie: nota.serie, chaveAcesso: nota.chaveAcesso, valorEnviado },
+      resumo,
+    );
+    if (divergencias.length === 0) {
+      logger.info(`${p} Conferência sistema × XML: sem divergências.`);
+    }
+    for (const divergencia of divergencias) {
+      logger.warn(`${p} ATENÇÃO — ${divergencia}`);
+    }
+  }
+
+  /**
    * Loga se o XML da NF-e foi incluído como xml_danfe no payload enviado à Tray.
    */
-  private logEnvioXml(orderId: string, nota: NotaFiscalTrayInput): void {
+  private logEnvioXml(orderId: string, nota: NotaFiscalTrayInput, p = '[TRAY FISCAL]'): void {
     if (nota.xml) {
-      logger.info(`[TRAY FISCAL] XML da NF-e incluído no payload (xml_danfe) do pedido ${orderId} — ${nota.xml.length} caracteres`);
+      logger.info(`${p} XML da NF-e incluído no payload (xml_danfe) do pedido ${orderId} — ${nota.xml.length} caracteres`);
     } else {
-      logger.warn(`[TRAY FISCAL] Nenhum XML disponível para anexar como xml_danfe na NF-e do pedido ${orderId}`);
+      logger.warn(`${p} Nenhum XML disponível para anexar como xml_danfe na NF-e do pedido ${orderId}`);
     }
   }
 
@@ -249,12 +320,12 @@ export class TrayFiscalService {
    * xml_danfe é substituído por um placeholder com o tamanho, pra não inflar
    * o log com o XML inteiro (o conteúdo já é logado separadamente por logEnvioXml).
    */
-  private logPayload(rota: string, orderInvoice: Record<string, unknown>): void {
+  private logPayload(rota: string, orderInvoice: Record<string, unknown>, p = '[TRAY FISCAL]'): void {
     const payloadParaLog = { ...orderInvoice };
     if (typeof payloadParaLog.xml_danfe === 'string') {
       payloadParaLog.xml_danfe = `<xml omitido, ${payloadParaLog.xml_danfe.length} caracteres>`;
     }
-    logger.info(`[TRAY FISCAL] Payload enviado — ${rota}: ${JSON.stringify(payloadParaLog)}`);
+    logger.info(`${p} Payload enviado — ${rota}: ${JSON.stringify(payloadParaLog)}`);
   }
 
   /**
@@ -262,27 +333,33 @@ export class TrayFiscalService {
    * A Tray espera o wrapper OrderInvoice com: number, serie, issue_date (YYYY-MM-DD),
    * key (44 dígitos) e value (numérico).
    */
-  async enviarNFe(orderId: string, nota: NotaFiscalTrayInput): Promise<EnviarNFeTrayResult> {
-    logger.info(`[TRAY FISCAL] NF-e recebida para registro — pedido ${orderId} (número=${nota.numero}, série=${nota.serie}, chave=${nota.chaveAcesso})`);
+  async enviarNFe(orderId: string, nota: NotaFiscalTrayInput, contexto?: EnvioTrayContexto): Promise<EnviarNFeTrayResult> {
+    const p = prefixoLog(contexto);
+    const inicio = Date.now();
+    logger.info(`${p} NF-e recebida para registro — pedido ${orderId} (número=${nota.numero}, série=${nota.serie}, chave=${nota.chaveAcesso})`);
 
     const erroValidacao = this.validarNota(nota);
     if (erroValidacao) {
-      logger.warn(`[TRAY FISCAL] NF-e do pedido ${orderId} inválida: ${erroValidacao}`);
+      logger.warn(`${p} NF-e do pedido ${orderId} inválida: ${erroValidacao}`);
       return { success: false, error: erroValidacao };
     }
 
     const orderInvoice = this.montarOrderInvoice(nota);
-    const productCfop = await this.construirProductCfop(orderId, nota.xml);
+    this.logDetalhesNota(orderId, nota, orderInvoice, p);
+
+    const productCfop = await this.construirProductCfop(orderId, nota.xml, p);
     if (productCfop) {
       orderInvoice.ProductCfop = productCfop;
+    } else {
+      logger.warn(`${p} ProductCfop NÃO será enviado — a Tray receberá a NF-e sem CFOP por produto.`);
     }
 
     const rotaEnvio = `POST /orders/${orderId}/invoices`;
-    this.logEnvioXml(orderId, nota);
-    this.logPayload(rotaEnvio, orderInvoice);
+    this.logEnvioXml(orderId, nota, p);
+    this.logPayload(rotaEnvio, orderInvoice, p);
 
     try {
-      logger.info(`[TRAY FISCAL] Enviando NF-e à Tray — ${rotaEnvio}`);
+      logger.info(`${p} Enviando NF-e à Tray — ${rotaEnvio}`);
       const resposta = await this.chamarTray<{ id?: string | number }>(
         'POST',
         'envio',
@@ -290,35 +367,44 @@ export class TrayFiscalService {
         null,
         `/orders/${orderId}/invoices`,
         { OrderInvoice: orderInvoice },
+        p,
       );
 
-      logger.success(`[TRAY FISCAL] SUCESSO — NF-e registrada no pedido Tray ${orderId}`);
+      logger.success(`${p} SUCESSO — NF-e registrada no pedido Tray ${orderId}`);
 
       const statusFaturadoId = process.env.TRAY_STATUS_FATURADO_ID;
+      if (!statusFaturadoId) {
+        logger.info(`${p} TRAY_STATUS_FATURADO_ID não configurado — status do pedido na Tray não será alterado.`);
+      }
       if (statusFaturadoId) {
         try {
           const statusIdNum = parseInt(statusFaturadoId, 10);
           if (!isNaN(statusIdNum) && statusIdNum > 0) {
+            logger.info(`${p} Atualizando status do pedido Tray ${orderId} para status_id=${statusIdNum}...`);
             await this.httpClient.put(`/orders/${orderId}`, {
               Order: {
                 status_id: statusIdNum,
               },
             });
-            logger.success(`[TRAY FISCAL] Status do pedido Tray ${orderId} atualizado para status_id=${statusIdNum}`);
+            logger.success(`${p} Status do pedido Tray ${orderId} atualizado para status_id=${statusIdNum}`);
           }
         } catch (statusError: any) {
-          logger.warn(`[TRAY FISCAL] NF-e registrada, mas falha ao atualizar status do pedido Tray ${orderId}: ${statusError.message}`);
+          logger.warn(`${p} NF-e registrada, mas falha ao atualizar status do pedido Tray ${orderId}: ${statusError.message}`);
         }
       }
 
       const invoiceId = resposta?.id !== undefined ? String(resposta.id) : undefined;
       if (invoiceId) {
-        this.agendarAtualizacaoNFe(orderId, invoiceId, nota);
+        logger.info(`${p} Tray devolveu invoice_id=${invoiceId} para a NF-e ${nota.numero}.`);
+        this.agendarAtualizacaoNFe(orderId, invoiceId, nota, contexto);
+      } else {
+        logger.warn(`${p} A Tray não devolveu um id da nota — a atualização automática (PUT) não será agendada e o botão "Atualizar na Tray" não funcionará para esta NF-e.`);
       }
 
+      logger.success(`${p} Envio concluído em ${Date.now() - inicio}ms — pedido Tray ${orderId}, NF-e ${nota.numero}/${nota.serie}, invoice_id=${invoiceId ?? 'não informado'}.`);
       return { success: true, invoiceId };
     } catch (error: any) {
-      logger.error(`[TRAY FISCAL] FALHA — erro ao registrar NF-e no pedido Tray ${orderId}: ${error.message}`);
+      logger.error(`${p} FALHA em ${Date.now() - inicio}ms — erro ao registrar NF-e no pedido Tray ${orderId}: ${error.message}`);
       return { success: false, error: error.message };
     }
   }
@@ -328,20 +414,21 @@ export class TrayFiscalService {
    * registro, 10 segundos após o POST bem-sucedido. O timer é "unref"ado para
    * não segurar o processo Node vivo (ex.: em testes ou durante um shutdown).
    */
-  private agendarAtualizacaoNFe(orderId: string, invoiceId: string, nota: NotaFiscalTrayInput): void {
-    logger.info(`[TRAY FISCAL] Atualização automática da NF-e ${invoiceId} do pedido ${orderId} agendada para daqui a ${ATRASO_ATUALIZACAO_NFE_MS / 1000}s`);
+  private agendarAtualizacaoNFe(orderId: string, invoiceId: string, nota: NotaFiscalTrayInput, contexto?: EnvioTrayContexto): void {
+    const p = prefixoLog(contexto);
+    logger.info(`${p} Atualização automática da NF-e ${invoiceId} do pedido ${orderId} agendada para daqui a ${ATRASO_ATUALIZACAO_NFE_MS / 1000}s`);
 
     const timer = setTimeout(() => {
-      this.atualizarNFe(orderId, invoiceId, nota, 'atualizacao_automatica')
+      this.atualizarNFe(orderId, invoiceId, nota, 'atualizacao_automatica', contexto)
         .then((resultado) => {
           if (resultado.success) {
-            logger.success(`[TRAY FISCAL] SUCESSO — atualização automática da NF-e ${invoiceId} do pedido ${orderId} concluída`);
+            logger.success(`${p} SUCESSO — atualização automática da NF-e ${invoiceId} do pedido ${orderId} concluída`);
           } else {
-            logger.warn(`[TRAY FISCAL] FALHA — atualização automática da NF-e ${invoiceId} do pedido ${orderId}: ${resultado.error}`);
+            logger.warn(`${p} FALHA — atualização automática da NF-e ${invoiceId} do pedido ${orderId}: ${resultado.error}`);
           }
         })
         .catch((error: any) => {
-          logger.error(`[TRAY FISCAL] FALHA — erro inesperado na atualização automática da NF-e ${invoiceId} do pedido ${orderId}: ${error.message}`);
+          logger.error(`${p} FALHA — erro inesperado na atualização automática da NF-e ${invoiceId} do pedido ${orderId}: ${error.message}`);
         });
     }, ATRASO_ATUALIZACAO_NFE_MS);
 
@@ -362,33 +449,35 @@ export class TrayFiscalService {
     invoiceId: string,
     nota: NotaFiscalTrayInput,
     origem: TrayFiscalLogOrigem = 'atualizacao_manual',
+    contexto?: EnvioTrayContexto,
   ): Promise<EnviarNFeTrayResult> {
-    logger.info(`[TRAY FISCAL] NF-e recebida para atualização — invoice ${invoiceId}, pedido ${orderId} (número=${nota.numero}, série=${nota.serie})`);
+    const p = prefixoLog(contexto);
+    logger.info(`${p} NF-e recebida para atualização — invoice ${invoiceId}, pedido ${orderId} (número=${nota.numero}, série=${nota.serie})`);
 
     const erroValidacao = this.validarNota(nota);
     if (erroValidacao) {
-      logger.warn(`[TRAY FISCAL] Atualização da NF-e ${invoiceId} do pedido ${orderId} abortada: ${erroValidacao}`);
+      logger.warn(`${p} Atualização da NF-e ${invoiceId} do pedido ${orderId} abortada: ${erroValidacao}`);
       return { success: false, error: erroValidacao };
     }
 
     const orderInvoice = this.montarOrderInvoice(nota);
-    const productCfop = await this.construirProductCfop(orderId, nota.xml);
+    const productCfop = await this.construirProductCfop(orderId, nota.xml, p);
     if (productCfop) {
       orderInvoice.ProductCfop = productCfop;
     }
 
     const rotaAtualizacao = `PUT /orders/${orderId}/invoices/${invoiceId}`;
-    this.logEnvioXml(orderId, nota);
-    this.logPayload(rotaAtualizacao, orderInvoice);
+    this.logEnvioXml(orderId, nota, p);
+    this.logPayload(rotaAtualizacao, orderInvoice, p);
 
     try {
-      logger.info(`[TRAY FISCAL] Enviando atualização da NF-e à Tray — ${rotaAtualizacao}`);
-      await this.chamarTray('PUT', origem, orderId, invoiceId, `/orders/${orderId}/invoices/${invoiceId}`, orderInvoice);
+      logger.info(`${p} Enviando atualização da NF-e à Tray — ${rotaAtualizacao}`);
+      await this.chamarTray('PUT', origem, orderId, invoiceId, `/orders/${orderId}/invoices/${invoiceId}`, orderInvoice, p);
 
-      logger.success(`[TRAY FISCAL] SUCESSO — NF-e ${invoiceId} atualizada no pedido Tray ${orderId}`);
+      logger.success(`${p} SUCESSO — NF-e ${invoiceId} atualizada no pedido Tray ${orderId}`);
       return { success: true, invoiceId };
     } catch (error: any) {
-      logger.error(`[TRAY FISCAL] FALHA — erro ao atualizar NF-e ${invoiceId} no pedido Tray ${orderId}: ${error.message}`);
+      logger.error(`${p} FALHA — erro ao atualizar NF-e ${invoiceId} no pedido Tray ${orderId}: ${error.message}`);
       return { success: false, error: error.message };
     }
   }
