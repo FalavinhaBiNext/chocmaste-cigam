@@ -11,6 +11,22 @@ export const createTransportadoraSchema = z.object({
 
 export type CreateTransportadoraInput = z.infer<typeof createTransportadoraSchema>;
 
+export const importarTransportadoraBlingSchema = z.object({
+  documento: z
+    .string({ message: 'documento é obrigatório.' })
+    .refine((v) => [11, 14].includes(v.replace(/\D/g, '').length), 'Informe um CNPJ (14 dígitos) ou CPF (11 dígitos).'),
+});
+
+export function validateImportarTransportadoraBling(input: unknown) {
+  const result = importarTransportadoraBlingSchema.safeParse(input);
+
+  if (!result.success) {
+    throw new ValidationError('Dados inválidos.', result.error.flatten());
+  }
+
+  return result.data;
+}
+
 export function validateCreateTransportadora(input: unknown) {
   const result = createTransportadoraSchema.safeParse(input);
 

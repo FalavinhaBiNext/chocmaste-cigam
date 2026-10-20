@@ -7,6 +7,7 @@ export function createTransportadoraRoutes(controller: TransportadoraController)
 
   router.get('/health', controller.health);
   router.post('/', asyncHandler(controller.create));
+  router.post('/importar-bling', asyncHandler(controller.importarDoBling));
   router.get('/', asyncHandler(controller.findAll));
   router.get('/bling/:idBling', asyncHandler(controller.findByIdBling));
   router.get('/:id', asyncHandler(controller.findById));

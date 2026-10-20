@@ -1,7 +1,7 @@
 import { injectable } from 'tsyringe';
 import { Request, Response } from "express";
 import { TransportadoraService } from "../services/transportadoraService";
-import { validateCreateTransportadora } from "../transportadora.validator";
+import { validateCreateTransportadora, validateImportarTransportadoraBling } from "../transportadora.validator";
 
 @injectable()
 export class TransportadoraController {
@@ -27,6 +27,25 @@ export class TransportadoraController {
       success: true,
       message: 'Transportadora created successfully',
       data: transportadora
+    })
+  }
+
+  /**
+   * Busca no Bling o contato pelo CPF/CNPJ e grava/atualiza a transportadora.
+   * POST /transportadoras/importar-bling  { documento }
+   */
+  importarDoBling = async (req: Request, res: Response) => {
+    const { documento } = validateImportarTransportadoraBling(req.body);
+    const resultado = await this.transportadoraService.importarDoBlingPorDocumento(documento);
+
+    res.status(resultado.acao === 'criada' ? 201 : 200).json({
+      success: true,
+      message:
+        `Transportadora "${resultado.transportadora.nome}" ${resultado.acao} a partir do Bling (ID ${resultado.transportadora.id_bling}).` +
+        (resultado.contatosEncontrados > 1
+          ? ` Atenção: há ${resultado.contatosEncontrados} contatos no Bling com esse documento; foi usado o primeiro ativo.`
+          : ''),
+      data: resultado,
     })
   }
 

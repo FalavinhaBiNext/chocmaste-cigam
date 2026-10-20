@@ -18,6 +18,36 @@ export class ContatosService {
     return response.data;
   }
 
+  /**
+   * Busca contatos no Bling por CPF/CNPJ. Tenta o filtro `numeroDocumento` da
+   * API v3 e, sem resultado, a busca textual `pesquisa`. Como um filtro que o
+   * Bling não reconhece é ignorado (e a resposta traria contatos quaisquer),
+   * só são aceitos os contatos cujo documento confere dígito a dígito.
+   */
+  async buscarPorDocumento(documento: string, tokenId?: string): Promise<ContatoBlingDTO[]> {
+    const digitos = documento.replace(/\D/g, '');
+    const confere = (c: ContatoBlingDTO) =>
+      (c.numeroDocumento || c.cpfCnpj || '').replace(/\D/g, '') === digitos;
+
+    for (const filtro of ['numeroDocumento', 'pesquisa']) {
+      const response = await this.blingHttpClient.get<ContatoBlingListResponse>(
+        `/contatos?${new URLSearchParams({ [filtro]: digitos }).toString()}`,
+        undefined,
+        tokenId,
+      );
+      const retornados = response?.data ?? [];
+      const encontrados = retornados.filter(confere);
+      logger.info(
+        `[BLING CONTATOS] Busca por documento ${digitos} via "${filtro}": ${retornados.length} retornado(s), ${encontrados.length} com o documento exato.`,
+      );
+      if (encontrados.length > 0) {
+        return [...new Map(encontrados.map((c) => [c.id, c])).values()];
+      }
+    }
+
+    return [];
+  }
+
   async list(pagina: number = 1, limite: number = 100, tipoContato?: number, tokenId?: string): Promise<BlingContatosListResponse> {
     const params = new URLSearchParams({
       pagina: String(pagina),
